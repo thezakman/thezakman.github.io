@@ -115,13 +115,16 @@ a {
   color: #159957; }
 .main-content p {
   margin-bottom: 1em; }
+
 .main-content code {
-  padding: 2px 4px;
+  padding: 3px 8px;
   font-family: Consolas, "Liberation Mono", Menlo, Courier, monospace;
   font-size: 0.9rem;
   color: #383e41;
   background-color: #f3f6fa;
-  border-radius: 0.3rem; }
+  border-radius: 0.1rem;
+  vertical-align: super;
+
 .main-content pre {
   padding: 0.8rem;
   margin-top: 0;
