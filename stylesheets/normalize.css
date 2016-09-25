@@ -183,6 +183,8 @@ sub {
 
 img {
   border: 0;
+  vertical-align: middle;
+  padding: 4px;
 }
 
 /**
