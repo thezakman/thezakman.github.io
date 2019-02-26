@@ -61,12 +61,12 @@
   }
 }
 
+/*
 @font-face {
     font-family: sevenSegmentFont;
     src: url(../assets/seven-segment-mono.ttf);
 }
-
-
+*/
 
 #flickertext {
 	-webkit-animation-name: flicker;
