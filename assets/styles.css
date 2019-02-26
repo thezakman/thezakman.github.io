@@ -1,0 +1,138 @@
+@keyframes flicker {
+  from {
+    opacity: .1;
+  }
+  29% {
+    opacity: .1;
+  }
+  30% {
+    opacity: 1;
+  }
+  35% {
+    opacity: 1;
+  }
+  36% {
+      opacity: .1;
+  }
+  59% {
+    opacity: .1;
+  }
+  60% {
+    opacity: 1;
+  }
+  62% {
+    opacity: 1;
+  }
+  63% {
+    opacity: .1;
+  }
+  64% {
+    opacity: .1;
+  }
+  65% {
+    opacity: 1;
+  }
+  66% {
+    opacity: 1;
+  }
+  67% {
+    opacity: .1;
+  }
+  89% {
+    opacity: .1;
+  }
+  90% {
+    opacity: 1;
+  }
+  91% {
+    opacity: .1;
+  }
+  92% {
+    opacity: 1;
+  }
+  93% {
+    opacity: .1;
+  }
+  94% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@font-face {
+    font-family: sevenSegmentFont;
+    src: url(../assets/seven-segment-mono.ttf);
+}
+
+html {
+	background-color: black;
+}
+
+p {
+	-webkit-font-smoothing: antialiased;
+	font-family: "Inconsolata";
+  font-size: 16px;
+  padding: 0px;
+  margin: 0px;
+}
+
+h2 > a, h2 > a:hover, h2 > a:focus, p > a, p > a:hover, p > a:focus {
+  color: rgba(255, 255, 255, 0.8);
+  text-decoration: underline;
+}
+
+h2 {
+	-webkit-font-smoothing: antialiased;
+	font-family: "Inconsolata";
+  font-size: 24px;
+  margin-top:12px;
+}
+
+#flickertext {
+	-webkit-animation-name: flicker;
+	-webkit-animation-duration: 3s;
+	-webkit-animation-iteration-count: 1;
+	-webkit-animation-timing-function: linear;
+}
+
+.sevensegment {
+  font: 124px sevenSegmentFont;
+  /*text-shadow: 0 0 10px #F96B0C, 0 0 30px #F97822, 0 0 70px #F98436, 0 0 100px #F9904A, 0 0 140px #FC9B5A, 0 0 160px #F9A166; */
+  text-shadow: 0 0 10px #5cb85c, 0 0 30px #07ff07, 0 0 70px #79ff79, 0 0 100px #3fc53f, 0 0 140px #12d012, 0 0 160px #78ff56
+}
+
+#info > h2 {
+  margin-top: 36px;
+}
+
+.header {
+  margin-bottom: 50px;
+}
+
+.inline {
+  height: 130px;
+  vertical-align: bottom;
+}
+
+#info {
+  margin-top: 125px;
+  margin-bottom: 100px;
+}
+
+#header {
+  margin-top: 150px;
+	text-align: center;
+}
+
+#wrapper {
+	width:  100%;
+	position: absolute;
+	color: rgba(255, 255, 255, 0.8);
+}
+
+#credit {
+  margin-top: 40px;
+  font-size: 12px;
+}
