@@ -1,0 +1,5 @@
+<!DOCTYPE testingxxe [ <!ENTITY xml "Hello World!"> ]> 
+<svg xmlns:svg="http://www.w3.org/2000/svg" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="200" height="200">
+<image height="30" width="30" xlink:href="https://pbs.twimg.com/profile_images/506947541179457536/6qLdMiWV_400x400.jpeg" /> 
+<text x="0" y="20" font-size="20">&xml;</text> 
+</svg>

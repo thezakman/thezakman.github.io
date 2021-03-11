@@ -1,0 +1,6 @@
+<!ENTITY lol "lol">
+<!ELEMENT lolz (#PCDATA)>
+]>
+<svg>
+<text>&lol;</text>
+</svg>
