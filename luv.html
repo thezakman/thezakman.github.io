@@ -116,9 +116,10 @@
 
         .exploding-emoji {
             position: absolute;
-            font-size: 40px;
+            font-size: 50px;
             animation: explode 1s ease-out forwards;
             pointer-events: none;
+            z-index: 99;
         }
 
         @keyframes explode {
@@ -202,12 +203,12 @@
 
         function explodeEmojis(event) {
             const emojis = ['❤️', '🦝', '🐥'];
-            for (let i = 0; i < 100; i++) {
+            for (let i = 0; i < 25; i++) {
                 const emoji = document.createElement('div');
                 emoji.classList.add('exploding-emoji');
                 emoji.textContent = emojis[Math.floor(Math.random() * emojis.length)];
-                emoji.style.left = `${event.clientX + (Math.random() - 0.5) * 1000}px`;
-                emoji.style.top = `${event.clientY + (Math.random() - 0.5) * 1000}px`;
+                emoji.style.left = `${event.clientX + (Math.random() - 0.5) * 500}px`;
+                emoji.style.top = `${event.clientY + (Math.random() - 0.5) * 500}px`;
                 document.body.appendChild(emoji);
 
                 emoji.addEventListener('animationend', () => {
