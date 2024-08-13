@@ -70,12 +70,53 @@
             50% {transform: translateY(-10px);}
         }
 
-        .exploding-heart {
+        .word-cloud {
+            position: fixed;
+            opacity: 0.5;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .word {
             position: absolute;
-            width: 20px;
-            height: 20px;
-            background-color: red;
-            clip-path: polygon(50% 0%, 0% 50%, 50% 100%, 100% 50%);
+            color: rgba(255, 255, 255, 0.8);
+            text-shadow: 1px 1px 2px var(--shadow-color);
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            pointer-events: auto;
+            padding: 0;
+            border-radius: 0;
+            background-color: transparent;
+        }
+
+        .word:hover {
+            transform: scale(1.2);
+            opacity: 1;
+            background-color: transparent;
+        }
+
+        .sparkle {
+            position: absolute;
+            width: 5px;
+            height: 5px;
+            background: #fff;
+            border-radius: 50%;
+            animation: sparkle 2s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        @keyframes sparkle {
+            0%, 100% {opacity: 0; transform: scale(0);}
+            50% {opacity: 1; transform: scale(1);}
+        }
+
+        .exploding-emoji {
+            position: absolute;
+            font-size: 40px;
             animation: explode 1s ease-out forwards;
             pointer-events: none;
         }
@@ -114,7 +155,7 @@
 
     <script>
         const words = [
-            "Potchaco", "Luv U", "Balonê", "2 Meses", "Sex", "Caravaggio", "Fashion", "Pintura a Oleo", "King", "Livraria", "Desenho", "Arte", "Pintura", "Livros", "Guloseimas", "Mike", "Carly", "Peter", "Raccoon", "Hello Kitty", "Vinho Tinto", "Conchinha", "Holding Hands", "Sexo 🔥", "Mestre Splinter", "Arte", "Amor", "🦝", "❤️", "🐥", "❤️‍🔥", "🐚", "⭐️", "🌟", "✨", "Pipoca", "🍿", "🧙", "Tarot", "Tings", "Jazz", "Cerveja", "😈", "🔥", "🫶", "🤭", "🍺", "🍷", "🙈", "💖", "Moon", "🌙", "🌕","🌞", "☀️", "🏄‍", "Small Riders", "🧠", "Te Amo", "Flores" 
+                        "Potchaco", "Luv U", "Balonê", "2 Meses", "Pipter", "Carlinha", "Carla", "", "Sex", "Caravaggio", "Fashion", "Pintura a Oleo", "King", "Livraria", "Desenho", "Arte", "Pintura", "Livros", "Guloseimas", "Mike", "Carly", "Peter", "Raccoon", "Hello Kitty", "Vinho Tinto", "Conchinha", "Holding Hands", "Sexo 🔥", "Mestre Splinter", "Arte", "Amor", "🦝", "❤️", "🐥", "❤️‍🔥", "🐚", "⭐️", "🌟", "✨", "Pipoca", "🍿", "🧙", "Tarot", "Tings", "Jazz", "Cerveja", "😈", "🔥", "🫶", "🤭", "🍺", "🍷", "🙈", "💖", "Moon", "🌙", "🌕","🌞", "☀️", "🏄‍", "Small Riders", "🧠", "Te Amo", "Flores" 
         ];
 
         function createWordCloud() {
@@ -159,16 +200,18 @@
             setTimeout(animateWords, 10000);
         }
 
-        function explodeHearts(event) {
+        function explodeEmojis(event) {
+            const emojis = ['❤️', '🦝', '🐥'];
             for (let i = 0; i < 20; i++) {
-                const heart = document.createElement('div');
-                heart.classList.add('exploding-heart');
-                heart.style.left = `${event.clientX + (Math.random() - 0.5) * 100}px`;
-                heart.style.top = `${event.clientY + (Math.random() - 0.5) * 100}px`;
-                document.body.appendChild(heart);
+                const emoji = document.createElement('div');
+                emoji.classList.add('exploding-emoji');
+                emoji.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+                emoji.style.left = `${event.clientX + (Math.random() - 0.5) * 100}px`;
+                emoji.style.top = `${event.clientY + (Math.random() - 0.5) * 100}px`;
+                document.body.appendChild(emoji);
 
-                heart.addEventListener('animationend', () => {
-                    heart.remove();
+                emoji.addEventListener('animationend', () => {
+                    emoji.remove();
                 });
             }
         }
@@ -177,7 +220,7 @@
         createSparkles();
         animateWords();
 
-        document.getElementById('heartContainer').addEventListener('click', explodeHearts);
+        document.getElementById('heartContainer').addEventListener('click', explodeEmojis);
 
         document.getElementById('wordCloud').addEventListener('click', (event) => {
             if (event.target.classList.contains('word')) {
