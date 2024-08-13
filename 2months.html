@@ -33,6 +33,7 @@
             font-size: 200px;
             animation: heartbeat 1.5s ease-in-out infinite;
             z-index: 10;
+            cursor: pointer;
             filter: drop-shadow(0 0 10px rgba(255, 105, 180, 0.7));
         }
 
@@ -87,7 +88,6 @@
             text-shadow: 1px 1px 2px var(--shadow-color);
             transition: transform 0.3s ease, opacity 0.3s ease;
             pointer-events: auto;
-            /* Removido o fundo e bordas arredondadas */
             padding: 0;
             border-radius: 0;
             background-color: transparent;
@@ -96,7 +96,6 @@
         .word:hover {
             transform: scale(1.2);
             opacity: 1;
-            /* Removido o fundo ao passar o mouse */
             background-color: transparent;
         }
 
@@ -115,6 +114,25 @@
             50% {opacity: 1; transform: scale(1);}
         }
 
+        .exploding-emoji {
+            position: absolute;
+            font-size: 50px;
+            animation: explode 1s ease-out forwards;
+            pointer-events: none;
+            z-index: 99;
+        }
+
+        @keyframes explode {
+            0% {
+                transform: scale(0);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(3);
+                opacity: 0;
+            }
+        }
+
         @media (max-width: 768px) {
             .heart-container {
                 font-size: 150px;
@@ -130,7 +148,7 @@
 </head>
 <body>
     <div class="word-cloud" id="wordCloud"></div>
-    <div class="heart-container">
+    <div class="heart-container" id="heartContainer">
         <span role="img" aria-label="Coração pegando fogo">❤️‍🔥</span>
         <span class="name">Carly</span>
     </div>
@@ -138,7 +156,7 @@
 
     <script>
         const words = [
-            "Potchaco", "Luv U", "Balonê", "2 Meses", "Sex", "Caravaggio", "Fashion", "Pintura a Oleo", "King", "Livraria", "Desenho", "Arte", "Pintura", "Livros", "Guloseimas", "Mike", "Carly", "Peter", "Raccoon", "Hello Kitty", "Vinho Tinto", "Conchinha", "Holding Hands", "Sexo 🔥", "Mestre Splinter", "Arte", "Amor", "🦝", "❤️", "🐥", "❤️‍🔥", "🐚", "⭐️", "🌟", "✨", "Pipoca", "🍿", "🧙", "Tarot", "Tings", "Jazz", "Cerveja", "😈", "🔥", "🫶", "🤭", "🍺", "🍷", "🙈", "💖", "Moon", "🌙", "🌕","🌞", "☀️", "🏄‍", "Small Riders", "🧠", "Te Amo", "Flores" 
+                        "Potchaco", "Luv U", "Balonê", "2 Meses", "Pipter", "Carlinha", "Carla", "", "Sex", "Caravaggio", "Fashion", "Pintura a Oleo", "King", "Livraria", "Desenho", "Arte", "Pintura", "Livros", "Guloseimas", "Mike", "Carly", "Peter", "Raccoon", "Hello Kitty", "Vinho Tinto", "Conchinha", "Holding Hands", "Sexo 🔥", "Mestre Splinter", "Arte", "Amor", "🦝", "❤️", "🐥", "❤️‍🔥", "🐚", "⭐️", "🌟", "✨", "Pipoca", "🍿", "🧙", "Tarot", "Tings", "Jazz", "Cerveja", "😈", "🔥", "🫶", "🤭", "🍺", "🍷", "🙈", "💖", "Moon", "🌙", "🌕","🌞", "☀️", "🏄‍", "Small Riders", "🧠", "Te Amo", "Flores" 
         ];
 
         function createWordCloud() {
@@ -183,9 +201,27 @@
             setTimeout(animateWords, 10000);
         }
 
+        function explodeEmojis(event) {
+            const emojis = ['❤️', '🦝', '🐥'];
+            for (let i = 0; i < 25; i++) {
+                const emoji = document.createElement('div');
+                emoji.classList.add('exploding-emoji');
+                emoji.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+                emoji.style.left = `${event.clientX + (Math.random() - 0.5) * 500}px`;
+                emoji.style.top = `${event.clientY + (Math.random() - 0.5) * 500}px`;
+                document.body.appendChild(emoji);
+
+                emoji.addEventListener('animationend', () => {
+                    emoji.remove();
+                });
+            }
+        }
+
         createWordCloud();
         createSparkles();
         animateWords();
+
+        document.getElementById('heartContainer').addEventListener('click', explodeEmojis);
 
         document.getElementById('wordCloud').addEventListener('click', (event) => {
             if (event.target.classList.contains('word')) {
