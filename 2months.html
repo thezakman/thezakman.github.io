@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luvsluuuuu, Carly!</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Montserrat:wght@300;400;700&display=swap');
+
+        :root {
+            --primary-color: #ff9a9e;
+            --secondary-color: #fad0c4;
+            --text-color: #333;
+            --shadow-color: rgba(0, 0, 0, 0.2);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            font-family: 'Montserrat', sans-serif;
+            overflow: hidden;
+            color: var(--text-color);
+        }
+
+        .heart-container {
+            position: relative;
+            font-size: 200px;
+            animation: heartbeat 1.5s ease-in-out infinite;
+            z-index: 10;
+            filter: drop-shadow(0 0 10px rgba(255, 105, 180, 0.7));
+        }
+
+        @keyframes heartbeat {
+            0% {transform: scale(1);}
+            14% {transform: scale(1.08);}
+            28% {transform: scale(1);}
+            42% {transform: scale(1.08);}
+            70% {transform: scale(1);}
+        }
+
+        .name {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 48px;
+            font-family: 'Dancing Script', cursive;
+            text-shadow: 2px 2px 4px var(--shadow-color);
+        }
+
+        .message {
+            margin-top: 20px;
+            font-size: 54px;
+            color: white;
+            text-shadow: 1px 1px 2px var(--shadow-color);
+            animation: float 3s ease-in-out infinite;
+            z-index: 10;
+        }
+
+        @keyframes float {
+            0%, 100% {transform: translateY(0);}
+            50% {transform: translateY(-10px);}
+        }
+
+        .word-cloud {
+            position: fixed;
+            opacity: 0.5;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .word {
+            position: absolute;
+            color: rgba(255, 255, 255, 0.8);
+            text-shadow: 1px 1px 2px var(--shadow-color);
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            pointer-events: auto;
+            /* Removido o fundo e bordas arredondadas */
+            padding: 0;
+            border-radius: 0;
+            background-color: transparent;
+        }
+
+        .word:hover {
+            transform: scale(1.2);
+            opacity: 1;
+            /* Removido o fundo ao passar o mouse */
+            background-color: transparent;
+        }
+
+        .sparkle {
+            position: absolute;
+            width: 5px;
+            height: 5px;
+            background: #fff;
+            border-radius: 50%;
+            animation: sparkle 2s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        @keyframes sparkle {
+            0%, 100% {opacity: 0; transform: scale(0);}
+            50% {opacity: 1; transform: scale(1);}
+        }
+
+        @media (max-width: 768px) {
+            .heart-container {
+                font-size: 150px;
+            }
+            .name {
+                font-size: 36px;
+            }
+            .message {
+                font-size: 50px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="word-cloud" id="wordCloud"></div>
+    <div class="heart-container">
+        <span role="img" aria-label="Coração pegando fogo">❤️‍🔥</span>
+        <span class="name">Carly</span>
+    </div>
+    <div class="message">🐥 + 🦝 = ❤️</div>
+
+    <script>
+        const words = [
+            "Potchaco", "King", "Livraria", "Desenho", "Arte", "Pintura", "Livros", "Guloseimas", "Mike", "Carly", "Peter", "Raccoon", "Hello Kitty", "Vinho Tinto", "Conchinha", "Holding Hands", "Sexo 🔥", "Mestre Splinter", "Arte", "Amor", "🦝", "❤️", "🐥", "❤️‍🔥", "🐚", "⭐️", "🌟", "✨", "Pipoca", "🍿", "🧙", "Tarot", "Tings", "Jazz", "Cerveja", "😈", "🔥", "🫶", "🤭", "🍺", "🍷", "🙈", "💖", "Moon", "🌙", "🌕","🌞", "☀️", "🏄‍", "Small Riders", "🧠", "Te Amo", "Flores" 
+        ];
+
+        function createWordCloud() {
+            const wordCloud = document.getElementById('wordCloud');
+            const fragment = document.createDocumentFragment();
+            for (let i = 0; i < 100; i++) {
+                const wordElement = document.createElement('div');
+                wordElement.classList.add('word');
+                wordElement.textContent = words[Math.floor(Math.random() * words.length)];
+                wordElement.style.left = `${Math.random() * 100}%`;
+                wordElement.style.top = `${Math.random() * 100}%`;
+                wordElement.style.fontSize = `${Math.random() * 4 + 16}px`;
+                wordElement.style.opacity = Math.random() * 0.5 + 0.5;
+                fragment.appendChild(wordElement);
+            }
+            wordCloud.appendChild(fragment);
+        }
+
+        function createSparkles() {
+            const fragment = document.createDocumentFragment();
+            for (let i = 0; i < 50; i++) {
+                const sparkle = document.createElement('div');
+                sparkle.classList.add('sparkle');
+                sparkle.style.left = `${Math.random() * 100}%`;
+                sparkle.style.top = `${Math.random() * 100}%`;
+                sparkle.style.animationDelay = `${Math.random() * 2}s`;
+                fragment.appendChild(sparkle);
+            }
+            document.body.appendChild(fragment);
+        }
+
+        function animateWords() {
+            const words = document.querySelectorAll('.word');
+            words.forEach(word => {
+                const x = Math.random() * 100;
+                const y = Math.random() * 100;
+                const duration = Math.random() * 20 + 10;
+                word.style.transition = `all ${duration}s linear`;
+                word.style.left = `${x}%`;
+                word.style.top = `${y}%`;
+            });
+            setTimeout(animateWords, 10000);
+        }
+
+        createWordCloud();
+        createSparkles();
+        animateWords();
+
+        document.getElementById('wordCloud').addEventListener('click', (event) => {
+            if (event.target.classList.contains('word')) {
+                event.target.style.transform = 'scale(1.5)';
+                event.target.style.opacity = '1';
+                setTimeout(() => {
+                    event.target.style.transform = '';
+                    event.target.style.opacity = '';
+                }, 1000);
+            }
+        });
+    </script>
+</body>
+</html>
