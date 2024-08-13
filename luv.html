@@ -202,12 +202,12 @@
 
         function explodeEmojis(event) {
             const emojis = ['❤️', '🦝', '🐥'];
-            for (let i = 0; i < 20; i++) {
+            for (let i = 0; i < 100; i++) {
                 const emoji = document.createElement('div');
                 emoji.classList.add('exploding-emoji');
                 emoji.textContent = emojis[Math.floor(Math.random() * emojis.length)];
-                emoji.style.left = `${event.clientX + (Math.random() - 0.5) * 100}px`;
-                emoji.style.top = `${event.clientY + (Math.random() - 0.5) * 100}px`;
+                emoji.style.left = `${event.clientX + (Math.random() - 0.5) * 1000}px`;
+                emoji.style.top = `${event.clientY + (Math.random() - 0.5) * 1000}px`;
                 document.body.appendChild(emoji);
 
                 emoji.addEventListener('animationend', () => {
