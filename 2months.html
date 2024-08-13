@@ -223,6 +223,22 @@
 
         document.getElementById('heartContainer').addEventListener('click', explodeEmojis);
 
+        let clickCount = 0;
+        const heartContainer = document.getElementById('heartContainer');
+
+        heartContainer.addEventListener('click', (event) => {
+            explodeEmojis(event);
+
+            clickCount++;
+            if (clickCount === 10) {
+                const answer = prompt("Qual a namorada mais linda do mundo?");
+                if (answer && answer.toLowerCase() === "carly") {
+                    window.location.href = "http://google.com";
+                }
+                clickCount = 0;  // Reseta o contador de cliques
+            }
+        });
+
         document.getElementById('wordCloud').addEventListener('click', (event) => {
             if (event.target.classList.contains('word')) {
                 event.target.style.transform = 'scale(1.5)';
