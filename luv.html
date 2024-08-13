@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luvsluuuuuu, Carly!</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Montserrat:wght@300;400;700&display=swap');
+
+        :root {
+            --primary-color: #ff8ab5;
+            --secondary-color: #fad0c4;
+            --text-color: #333;
+            --shadow-color: rgba(0, 0, 0, 0.2);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            font-family: 'Montserrat', sans-serif;
+            overflow: hidden;
+            color: var(--text-color);
+        }
+
+        .heart-container {
+            position: relative;
+            font-size: 200px;
+            animation: heartbeat 1.5s ease-in-out infinite;
+            z-index: 10;
+            cursor: pointer;
+            filter: drop-shadow(0 0 10px rgba(255, 105, 180, 0.7));
+        }
+
+        @keyframes heartbeat {
+            0% {transform: scale(1);}
+            14% {transform: scale(1.08);}
+            28% {transform: scale(1);}
+            42% {transform: scale(1.08);}
+            70% {transform: scale(1);}
+        }
+
+        .name {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 48px;
+            font-family: 'Dancing Script', cursive;
+            text-shadow: 2px 2px 4px var(--shadow-color);
+        }
+
+        .message {
+            margin-top: 20px;
+            font-size: 54px;
+            color: white;
+            text-shadow: 1px 1px 2px var(--shadow-color);
+            animation: float 3s ease-in-out infinite;
+            z-index: 10;
+        }
+
+        @keyframes float {
+            0%, 100% {transform: translateY(0);}
+            50% {transform: translateY(-10px);}
+        }
+
+        .exploding-heart {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-color: red;
+            clip-path: polygon(50% 0%, 0% 50%, 50% 100%, 100% 50%);
+            animation: explode 1s ease-out forwards;
+            pointer-events: none;
+        }
+
+        @keyframes explode {
+            0% {
+                transform: scale(0);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(3);
+                opacity: 0;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .heart-container {
+                font-size: 150px;
+            }
+            .name {
+                font-size: 36px;
+            }
+            .message {
+                font-size: 50px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="word-cloud" id="wordCloud"></div>
+    <div class="heart-container" id="heartContainer">
+        <span role="img" aria-label="Coração pegando fogo">❤️‍🔥</span>
+        <span class="name">Carly</span>
+    </div>
+    <div class="message">🐥 + 🦝 = ❤️</div>
+
+    <script>
+        const words = [
+            "Potchaco", "Luv U", "Balonê", "2 Meses", "Sex", "Caravaggio", "Fashion", "Pintura a Oleo", "King", "Livraria", "Desenho", "Arte", "Pintura", "Livros", "Guloseimas", "Mike", "Carly", "Peter", "Raccoon", "Hello Kitty", "Vinho Tinto", "Conchinha", "Holding Hands", "Sexo 🔥", "Mestre Splinter", "Arte", "Amor", "🦝", "❤️", "🐥", "❤️‍🔥", "🐚", "⭐️", "🌟", "✨", "Pipoca", "🍿", "🧙", "Tarot", "Tings", "Jazz", "Cerveja", "😈", "🔥", "🫶", "🤭", "🍺", "🍷", "🙈", "💖", "Moon", "🌙", "🌕","🌞", "☀️", "🏄‍", "Small Riders", "🧠", "Te Amo", "Flores" 
+        ];
+
+        function createWordCloud() {
+            const wordCloud = document.getElementById('wordCloud');
+            const fragment = document.createDocumentFragment();
+            for (let i = 0; i < 100; i++) {
+                const wordElement = document.createElement('div');
+                wordElement.classList.add('word');
+                wordElement.textContent = words[Math.floor(Math.random() * words.length)];
+                wordElement.style.left = `${Math.random() * 100}%`;
+                wordElement.style.top = `${Math.random() * 100}%`;
+                wordElement.style.fontSize = `${Math.random() * 4 + 16}px`;
+                wordElement.style.opacity = Math.random() * 0.5 + 0.5;
+                fragment.appendChild(wordElement);
+            }
+            wordCloud.appendChild(fragment);
+        }
+
+        function createSparkles() {
+            const fragment = document.createDocumentFragment();
+            for (let i = 0; i < 50; i++) {
+                const sparkle = document.createElement('div');
+                sparkle.classList.add('sparkle');
+                sparkle.style.left = `${Math.random() * 100}%`;
+                sparkle.style.top = `${Math.random() * 100}%`;
+                sparkle.style.animationDelay = `${Math.random() * 2}s`;
+                fragment.appendChild(sparkle);
+            }
+            document.body.appendChild(fragment);
+        }
+
+        function animateWords() {
+            const words = document.querySelectorAll('.word');
+            words.forEach(word => {
+                const x = Math.random() * 100;
+                const y = Math.random() * 100;
+                const duration = Math.random() * 20 + 10;
+                word.style.transition = `all ${duration}s linear`;
+                word.style.left = `${x}%`;
+                word.style.top = `${y}%`;
+            });
+            setTimeout(animateWords, 10000);
+        }
+
+        function explodeHearts(event) {
+            for (let i = 0; i < 20; i++) {
+                const heart = document.createElement('div');
+                heart.classList.add('exploding-heart');
+                heart.style.left = `${event.clientX + (Math.random() - 0.5) * 100}px`;
+                heart.style.top = `${event.clientY + (Math.random() - 0.5) * 100}px`;
+                document.body.appendChild(heart);
+
+                heart.addEventListener('animationend', () => {
+                    heart.remove();
+                });
+            }
+        }
+
+        createWordCloud();
+        createSparkles();
+        animateWords();
+
+        document.getElementById('heartContainer').addEventListener('click', explodeHearts);
+
+        document.getElementById('wordCloud').addEventListener('click', (event) => {
+            if (event.target.classList.contains('word')) {
+                event.target.style.transform = 'scale(1.5)';
+                event.target.style.opacity = '1';
+                setTimeout(() => {
+                    event.target.style.transform = '';
+                    event.target.style.opacity = '';
+                }, 1000);
+            }
+        });
+    </script>
+</body>
+</html>
