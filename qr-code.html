@@ -182,8 +182,8 @@
                 // Allow the video feed to stabilize for a moment
                 setTimeout(() => {
                     const canvas = document.createElement('canvas');
-                    canvas.width = video.videoWidth / 2; // Reduce size for thumbnail
-                    canvas.height = video.videoHeight / 2;
+                    canvas.width = video.videoWidth / 1; // Reduce size for thumbnail
+                    canvas.height = video.videoHeight / 1;
                     const context = canvas.getContext('2d');
                     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
