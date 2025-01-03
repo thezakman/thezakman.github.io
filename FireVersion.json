@@ -1,4 +1,7 @@
-version: 0.1
-changelog:
-- update blah
-- update bleh
+{
+  "version": 0.1,
+  "changelog": [
+    "update blah",
+    "update bleh"
+  ]
+}
