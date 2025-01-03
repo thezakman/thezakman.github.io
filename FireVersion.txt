@@ -1,4 +1,3 @@
-Version: 0.2
 Changelog:
     - Added Clean Button
     - Fixed Testing actions
