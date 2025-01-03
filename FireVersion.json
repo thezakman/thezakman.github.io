@@ -1,7 +1,4 @@
-{
-  "version": 0.2,
-  "changelog": [
-    "Added Clean Button",
-    "Fixed Testing actions"
-  ]
-}
+Version: 0.2
+Changelog:
+    - Added Clean Button
+    - Fixed Testing actions
