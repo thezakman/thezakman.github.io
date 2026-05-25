@@ -173,7 +173,7 @@ function StatusBar({ bootStart, phosphor }) {
   const load = useMemo(() => (0.3 + Math.sin(tick / 7) * 0.25 + Math.random() * 0.1).toFixed(2), [tick]);
   return (
     <div className="statusbar">
-      <span className="seg"><span className="dim">SYS</span> TZM-OS v25.04</span>
+      <span className="seg"><span className="dim">SYS</span> TZM-OS</span>
       <span className="seg hide-mobile"><span className="dim">PID</span> {sysid}</span>
       <span className="seg hide-mobile"><span className="dim">PHOSPHOR</span> {phosphor.toUpperCase()}</span>
       <span className="seg"><span className="dim">LOAD</span> {load}</span>
