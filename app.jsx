@@ -459,8 +459,8 @@ function App() {
                   );
                   if (h.kind === 'about') return (
                     <div key={i} className="out">
-                      <p>I'm a <span className="hi">Graphic &amp; CGI Artist</span> that loves guitar and python <span className="heart">{'♥'}</span></p>
-                      <p>On the internet since <span className="hi">1999</span>. cat photos collected: {'∞'}.</p>
+                      <p>I'm a <span className="hi">Hacker  / Graphic &amp; CGI Artist</span> that loves to play guitar and mess around with python <span className="heart">{'♥'}</span></p>
+                      <p>On the internet breaking and fixing stuff, since <span className="hi">1997</span>.</p>
                     </div>
                   );
                   if (h.kind === 'social') return (
