@@ -4,42 +4,6 @@ const { useState, useEffect, useRef, useMemo, useCallback } = React;
    TZM-OS — CRT terminal landing page
    ========================================================= */
 
-const TZM_LOGO = String.raw`
-            ooo"
-           $$
-           $$                                ooooo"""$"""o
-           $$o                            o""  $    o"    $
-oo$        $$oo                       oo"""    o"   o"     $
- "$o        ""$$$o                oo"     oo"""""""""""ooo"
-  "$o          ""$$o          oo"     oo"               $
-   ""$$$$ooo     "$$o     oo"     oo"     o$"""$"""ooo"
-         """$o     "$$ooo""    oo"     oo""      $    o"
-             "$o    o$$"oo" oo""    oo""oooo    oo"  o"
-       oo     $o$$$""o"o"oo$$"  oo""        "o$"  oo$$$$$$$$$
-    o$$$$$ o$""$$"  " o"o$oo" oo""              $o$o
-   $$$$$$"$"o$$o$$$$$ o"o$o""               $o$
-  o$$$$$$"$o$$$$""""""$$$$oo$oo o       oo$$$$$$oo
-"o$$$$$$$o$$$$$$$$$$$o$$$$$$$$$$$$ooooo$$$$$$$$$$$$$o
- "$$$$$$$ $$$$$$$$$$$$ ""$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-  o$ooo$$ $$$$$$$$$$$$  "$$o$$$$$$$$$$$$$$$$$$$$$$$$$
-o"$$$$$$$o$$$$$$$$$$$$o$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-  $$$$$$$ $$$$$$"""""  $$$$$$$$$$$"""""$$$$$$$$$$$"
-   $$$$$$"$"$$$$$$$$$o$$$$""$"           ""$$$$$$""
-    $$$$$$"$o""o$"""" "o"$ ""oo            $"$"
-      ""$$"  """$$$oo" "o"$""o  ""oo    o"$o  ""$$$$$$$$$$
-              o$ """"$$o"o""$$o   ""o""    ""o          $
-            o$"       "$$$$"o  ""o    ""o    $    "o    $
-     oooo$$$"       o$$" ""o    ""o     "$ooo$ooooo"""o
-   $$""""        o$$"        ""o    ""o              $
-  $$           oo$$"            ""o    ""o            $
-o$$         o$$""                  ""o    ""ooooo"""o
-  "        $$$                        ""ooo  "o   "o $
-           $$                              "oo $    "o$
-           $$                                  """""o$$"
-           $$
-          o$$
-`;
-
 const SOCIALS = [
   { glyph: 'T', name: 'tumblr',     handle: '@thezakman',     url: 'https://thezakman.tumblr.com/',                            kb: '4.2K' },
   { glyph: '♫', name: 'soundcloud', handle: '/thezakman',     url: 'https://soundcloud.com/thezakman',                         kb: '12M'  },
@@ -53,22 +17,28 @@ const SOCIALS = [
   { glyph: '@', name: 'upwork',     handle: '~freelancer',    url: 'https://www.upwork.com/freelancers/~013c497232fa2ab3ad',   kb: '256'  },
 ];
 
-/* ---------- helpers ---------- */
+const CMDS = ['about', 'social', 'donate', 'contact', 'neofetch', 'matrix', 'cats', 'date', 'clear'];
+
+/* ==================== helpers ==================== */
+
 function nowStr() {
   const d = new Date();
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
 }
+
 function dateStr() {
   const d = new Date();
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
+
 function uptimeSince(start) {
   const s = Math.floor((Date.now() - start) / 1000);
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
   return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
 }
+
 function rndHex(len = 8) {
   const c = '0123456789ABCDEF';
   let s = '';
@@ -76,7 +46,8 @@ function rndHex(len = 8) {
   return s;
 }
 
-/* ---------- type-on hook ---------- */
+/* ==================== type-on hook ==================== */
+
 function useTypeOn(text, speed = 8, start = true) {
   const [out, setOut] = useState('');
   const [done, setDone] = useState(false);
@@ -94,13 +65,40 @@ function useTypeOn(text, speed = 8, start = true) {
   return [out, done];
 }
 
-/* ---------- presentational ---------- */
-function Prompt({ cmd, children }) {
+/* ==================== components ==================== */
+
+function PhosphorImage({ src, alt, className }) {
+  return (
+    <div
+      className={`phosphor-img ${className || ''}`}
+      style={{ '--img': `url(${src})` }}
+      role="img"
+      aria-label={alt}
+    >
+      <img src={src} alt={alt} style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0 }} />
+    </div>
+  );
+}
+
+function Prompt({ cmd }) {
+  return (
+    <div className="section-hd">
+      <span className="ps1-user">tzm</span>
+      <span className="ps1-at">@</span>
+      <span className="ps1-host">cyberspace</span>
+      <span className="ps1-colon">:</span>
+      <span className="ps1-path">~</span>
+      <span className="ps1-dollar">$</span>
+      <span className="ps1-cmd"> {cmd}</span>
+    </div>
+  );
+}
+
+function FullPrompt({ cmd }) {
   return (
     <div className="line">
       <span className="ps1"><span className="ps1-user">tzm</span><span className="ps1-at">@</span><span className="ps1-host">cyberspace</span><span className="ps1-colon">:</span><span className="ps1-path">~</span><span className="ps1-dollar">$</span></span>
       <span className="ps1-cmd"> {cmd}</span>
-      {children}
     </div>
   );
 }
@@ -114,17 +112,11 @@ function BootLine({ text, ok = true, delay = 0, onDone }) {
   return (
     <div className="line boot">
       <span className="dim">[</span>
-      <span className={ok ? 'ok' : 'warn'}>{ok ? '  OK  ' : ' WARN ' }</span>
+      <span className={ok ? 'ok' : 'warn'}>{ok ? '  OK  ' : ' WARN '}</span>
       <span className="dim">]</span>
       <span> {typed}</span>
       {done && ok && <span className="trail dim"> ✓</span>}
     </div>
-  );
-}
-
-function AsciiLogo() {
-  return (
-    <pre className="ascii" aria-hidden="true">{TZM_LOGO}</pre>
   );
 }
 
@@ -142,18 +134,10 @@ function CmdKbd({ cmd, onRun }) {
   );
 }
 
-function SocialRow({ s, idx, onFocus }) {
+function SocialRow({ s }) {
   const date = dateStr();
   return (
-    <a
-      className="socrow"
-      href={s.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      onMouseEnter={() => onFocus && onFocus(idx)}
-      onTouchStart={() => onFocus && onFocus(idx)}
-      data-idx={idx}
-    >
+    <a className="socrow" href={s.url} target="_blank" rel="noopener noreferrer">
       <span className="perms">lrwxrwxrwx</span>
       <span className="links">1</span>
       <span className="owner">tzm</span>
@@ -169,7 +153,28 @@ function SocialRow({ s, idx, onFocus }) {
   );
 }
 
-/* ---------- live status bar ---------- */
+function NeofetchBlock() {
+  return (
+    <div className="out neofetch">
+      <PhosphorImage src="tzm.png" alt="tzm" className="neofetch-logo" />
+      <div className="specs">
+        <div><span className="dim">os       </span> tzm-os 25.04 (cyberspace)</div>
+        <div><span className="dim">host     </span> thezakman.github.io</div>
+        <div><span className="dim">kernel   </span> 6.9.1-vt323-glow</div>
+        <div><span className="dim">shell    </span> tzm-sh 1.0</div>
+        <div><span className="dim">resolution</span> 1024 {'×'} 768 (CRT)</div>
+        <div><span className="dim">de       </span> phosphor + scanlines</div>
+        <div><span className="dim">cpu      </span> heart {'×'} 1 @ 60bpm</div>
+        <div><span className="dim">gpu      </span> caffeine + cold beer</div>
+        <div><span className="dim">memory   </span> 17527 cat photos / {'∞'}</div>
+        <div><span className="dim">uptime   </span> since 1999</div>
+      </div>
+    </div>
+  );
+}
+
+/* ==================== status bar ==================== */
+
 function StatusBar({ bootStart, phosphor }) {
   const [tick, setTick] = useState(0);
   useEffect(() => { const id = setInterval(() => setTick(t => t + 1), 1000); return () => clearInterval(id); }, []);
@@ -187,7 +192,47 @@ function StatusBar({ bootStart, phosphor }) {
   );
 }
 
-/* ---------- main app ---------- */
+/* ==================== matrix rain ==================== */
+
+function MatrixRain() {
+  const ref = useRef(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth;
+    const h = 200;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.height = h + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ01THEZAKMAN'.split('');
+    const cols = Math.floor(w / 12);
+    const drops = Array(cols).fill(0).map(() => Math.random() * h);
+    let raf;
+    const draw = () => {
+      ctx.fillStyle = 'rgba(2, 9, 6, 0.18)';
+      ctx.fillRect(0, 0, w, h);
+      ctx.font = '16px VT323, monospace';
+      ctx.fillStyle = getComputedStyle(canvas).color;
+      for (let i = 0; i < drops.length; i++) {
+        const ch = chars[Math.floor(Math.random() * chars.length)];
+        ctx.fillText(ch, i * 12, drops[i]);
+        drops[i] += 14;
+        if (drops[i] > h && Math.random() > 0.96) drops[i] = 0;
+      }
+      raf = requestAnimationFrame(draw);
+    };
+    draw();
+    const stop = setTimeout(() => cancelAnimationFrame(raf), 6000);
+    return () => { cancelAnimationFrame(raf); clearTimeout(stop); };
+  }, []);
+  return <canvas className="matrix" ref={ref}></canvas>;
+}
+
+/* ==================== main app ==================== */
+
 function App() {
   const tweaksDefaults = /*EDITMODE-BEGIN*/{
     "phosphor": "green",
@@ -201,14 +246,35 @@ function App() {
 
   const [v, setTweak] = (window.useTweaks || ((d) => [d, () => {}]))(tweaksDefaults);
 
+  /* boot phase */
   const [phase, setPhase] = useState('boot');
   const [bootStart] = useState(Date.now());
   const [bootDone, setBootDone] = useState(0);
   const totalBoot = 8;
+  const wasSkipped = useRef(false);
 
+  const skipBoot = useCallback(() => {
+    wasSkipped.current = true;
+    setBootDone(totalBoot);
+    setPhase('done');
+  }, []);
+
+  useEffect(() => {
+    if (phase !== 'boot') return;
+    const handler = () => skipBoot();
+    window.addEventListener('click', handler);
+    window.addEventListener('touchstart', handler);
+    window.addEventListener('keydown', handler);
+    return () => {
+      window.removeEventListener('click', handler);
+      window.removeEventListener('touchstart', handler);
+      window.removeEventListener('keydown', handler);
+    };
+  }, [phase, skipBoot]);
+
+  /* terminal state */
   const [history, setHistory] = useState([]);
   const [input, setInput] = useState('');
-  const [focusedIdx, setFocusedIdx] = useState(-1);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
   const cmdHistory = useRef([]);
@@ -222,7 +288,14 @@ function App() {
     }
   }, []);
 
-  useEffect(() => { scrollToBottom(); }, [history, phase, bootDone, scrollToBottom]);
+  useEffect(() => {
+    if (wasSkipped.current) {
+      wasSkipped.current = false;
+      if (scrollRef.current) scrollRef.current.scrollTop = 0;
+      return;
+    }
+    scrollToBottom();
+  }, [history, phase, bootDone, scrollToBottom]);
 
   useEffect(() => {
     if (phase === 'boot' && bootDone >= totalBoot) {
@@ -239,25 +312,24 @@ function App() {
 
   useEffect(() => {
     const focus = (e) => {
+      if (phase !== 'done') return;
       if (e.target.tagName === 'A' || e.target.closest('a') ||
           e.target.tagName === 'BUTTON' || e.target.closest('button') ||
-          e.target.closest('.twk-panel')) return;
+          e.target.closest('.twk-panel') ||
+          e.target.classList.contains('kbd') || e.target.closest('.kbd')) return;
       if (inputRef.current) inputRef.current.focus();
     };
     window.addEventListener('click', focus);
-    window.addEventListener('touchend', focus);
-    return () => {
-      window.removeEventListener('click', focus);
-      window.removeEventListener('touchend', focus);
-    };
-  }, []);
+    return () => window.removeEventListener('click', focus);
+  }, [phase]);
 
+  /* phosphor */
   const phosphorMap = {
-    green:  { fg: '#39ff7a', bg: '#020906', glow: '#3fffa1' },
-    amber:  { fg: '#ffb000', bg: '#0a0500', glow: '#ffd166' },
-    white:  { fg: '#e8f4ff', bg: '#02060a', glow: '#a8d8ff' },
-    cyan:   { fg: '#4fe6ff', bg: '#011014', glow: '#7af0ff' },
-    magenta:{ fg: '#ff5fd1', bg: '#0a0410', glow: '#ff9be4' },
+    green:  { fg: '#39ff7a', bg: '#020906', glow: '#3fffa1', hue: '90deg' },
+    amber:  { fg: '#ffb000', bg: '#0a0500', glow: '#ffd166', hue: '25deg' },
+    white:  { fg: '#e8f4ff', bg: '#02060a', glow: '#a8d8ff', hue: '0deg'  },
+    cyan:   { fg: '#4fe6ff', bg: '#011014', glow: '#7af0ff', hue: '150deg' },
+    magenta:{ fg: '#ff5fd1', bg: '#0a0410', glow: '#ff9be4', hue: '270deg' },
   };
   const ph = phosphorMap[v.phosphor] || phosphorMap.green;
 
@@ -265,12 +337,14 @@ function App() {
     '--fg': ph.fg,
     '--bg': ph.bg,
     '--glow': ph.glow,
+    '--phosphor-hue': ph.hue,
     '--scanline-a': v.scanlines,
     '--text-shadow': `0 0 ${4 * v.glow}px ${ph.glow}, 0 0 ${10 * v.glow}px ${ph.glow}88`,
     '--font-body': v.font === 'vt323' ? "'VT323', 'IBM Plex Mono', monospace" : "'JetBrains Mono', 'IBM Plex Mono', monospace",
     '--font-size': v.font === 'vt323' ? '20px' : '15px',
   };
 
+  /* command handler */
   const runCommand = useCallback((raw) => {
     const cmd = raw.trim();
     const echo = { kind: 'echo', cmd: raw };
@@ -344,7 +418,7 @@ function App() {
     }
   };
 
-  const CMDS = ['about', 'social', 'donate', 'contact', 'neofetch', 'matrix', 'cats', 'date', 'clear'];
+  /* ==================== render ==================== */
 
   return (
     <div className={`crt ph-${v.phosphor} font-${v.font} ${v.curvature ? 'curved' : ''} ${v.flicker ? 'flicker' : ''} ${v.jitter ? 'jitter' : ''}`} style={cssVars}>
@@ -357,23 +431,28 @@ function App() {
           <StatusBar bootStart={bootStart} phosphor={v.phosphor} />
 
           <div className="terminal" ref={scrollRef}>
-            <div className="boot-block">
-              <BootLine delay={50}   text="TZM-BIOS v25.04.18  © 1999-2026 TheZakMan Industries" onDone={() => setBootDone(b => Math.max(b,1))} />
-              <BootLine delay={250}  text="CPU... Pentium IV @ 3.2GHz (overclocked w/ vibes)"   onDone={() => setBootDone(b => Math.max(b,2))} />
-              <BootLine delay={420}  text="Memory test ... 640K (should be enough for anybody)" onDone={() => setBootDone(b => Math.max(b,3))} />
-              <BootLine delay={650}  text="Detecting devices: guitar /dev/strat ... python /dev/snek" onDone={() => setBootDone(b => Math.max(b,4))} />
-              <BootLine delay={900}  text="Mounting /home/tzm ... loading cat photos archive (1999→)" onDone={() => setBootDone(b => Math.max(b,5))} />
-              <BootLine delay={1150} text="Initializing CRT phosphor matrix ... aligning scanlines" onDone={() => setBootDone(b => Math.max(b,6))} />
-              <BootLine delay={1400} text="Network: IRC → freenode/#thezakman ... ONLINE" onDone={() => setBootDone(b => Math.max(b,7))} />
-              <BootLine delay={1650} text="Starting tzm-sh ... ready" onDone={() => setBootDone(b => Math.max(b,8))} />
-            </div>
 
+            {/* === BOOT PHASE === */}
+            {phase === 'boot' && (
+              <div className="boot-block">
+                <BootLine delay={50}   text="TZM-BIOS v25.04.18  © 1999-2026 TheZakMan Industries" onDone={() => setBootDone(b => Math.max(b,1))} />
+                <BootLine delay={250}  text="CPU... Pentium IV @ 3.2GHz (overclocked w/ vibes)"   onDone={() => setBootDone(b => Math.max(b,2))} />
+                <BootLine delay={420}  text="Memory test ... 640K (should be enough for anybody)" onDone={() => setBootDone(b => Math.max(b,3))} />
+                <BootLine delay={650}  text="Detecting devices: guitar /dev/strat ... python /dev/snek" onDone={() => setBootDone(b => Math.max(b,4))} />
+                <BootLine delay={900}  text="Mounting /home/tzm ... loading cat photos archive (1999→)" onDone={() => setBootDone(b => Math.max(b,5))} />
+                <BootLine delay={1150} text="Initializing CRT phosphor matrix ... aligning scanlines" onDone={() => setBootDone(b => Math.max(b,6))} />
+                <BootLine delay={1400} text="Network: IRC → freenode/#thezakman ... ONLINE" onDone={() => setBootDone(b => Math.max(b,7))} />
+                <BootLine delay={1650} text="Starting tzm-sh ... ready" onDone={() => setBootDone(b => Math.max(b,8))} />
+                <div className="boot-skip-hint">tap anywhere to skip</div>
+              </div>
+            )}
+
+            {/* === MAIN CONTENT === */}
             {phase === 'done' && (
               <>
-                <div className="spacer" />
-
+                {/* LOGO + NAME */}
                 <div className="logo-frame">
-                  <AsciiLogo />
+                  <PhosphorImage src="tzm.png" alt="TheZakMan logo" className="logo-main" />
                   <div className="logo-tag">
                     <span className="tag-big">TheZakMan</span>
                     <span className="tag-sm">Graphic + CGI artist · plays guitar · codes in python {'♥'}</span>
@@ -381,119 +460,88 @@ function App() {
                   </div>
                 </div>
 
-                <div className="spacer" />
-
-                <Prompt cmd="whoami" />
-                <div className="out">
-                  <span>TheZakMan</span> <span className="dim">{'—'} Graphic &amp; CGI Artist · guitarist · python wrangler · cat-photo archivist · online since 1999</span>
-                </div>
-
-                <div className="spacer" />
-
-                <Prompt cmd="cat /etc/social.conf" />
-                <div className="out">
-                  <span className="dim"># this page is a portal to all my social media accounts.</span><br/>
-                  <span className="dim"># click any handle below to jump out.</span>
-                </div>
-
-                <div className="spacer" />
-
-                <Prompt cmd="ls -la /social" />
-                <div className="out">
-                  <div className="socrow head">
-                    <span className="perms dim">PERMS</span>
-                    <span className="links dim">L</span>
-                    <span className="owner dim">USER</span>
-                    <span className="group dim">GROUP</span>
-                    <span className="size dim">FOLLOWERS</span>
-                    <span className="date dim">MTIME</span>
-                    <span className="glyph dim">GLYPH</span>
-                    <span className="name dim">NAME</span>
-                    <span className="arrow dim"></span>
-                    <span className="handle dim">HANDLE</span>
-                    <span className="url dim">{'→'} TARGET</span>
+                {/* ABOUT */}
+                <section className="section">
+                  <Prompt cmd="whoami" />
+                  <div className="out">
+                    <p>I'm a <span className="hi">Graphic &amp; CGI Artist</span> that loves to play guitar and code in <span className="hi">python</span> <span className="heart">{'♥'}</span></p>
+                    <p>I have been on the internet since <span className="hi">1999</span>, learning and enjoying photos of cats.</p>
+                    <p className="dim">tags: art · cgi · music · code · cats · beer · crts · old-internet</p>
                   </div>
-                  {SOCIALS.map((s, i) => (
-                    <SocialRow key={s.name} s={s} idx={i} onFocus={setFocusedIdx} />
-                  ))}
-                  <div className="socfoot dim">
-                    total {SOCIALS.length} symlinks · all destinations off-site · open with: <CmdKbd cmd="click" onRun={() => {}} />
+                </section>
+
+                {/* SOCIAL LINKS */}
+                <section className="section">
+                  <Prompt cmd="ls -la /social" />
+                  <div className="out">
+                    <div className="socrow head">
+                      <span className="perms dim">PERMS</span>
+                      <span className="links dim">L</span>
+                      <span className="owner dim">USER</span>
+                      <span className="group dim">GROUP</span>
+                      <span className="size dim">SIZE</span>
+                      <span className="date dim">MTIME</span>
+                      <span className="glyph dim">GL</span>
+                      <span className="name dim">NAME</span>
+                      <span className="arrow dim"></span>
+                      <span className="handle dim">HANDLE</span>
+                      <span className="url dim">{'→'} TARGET</span>
+                    </div>
+                    {SOCIALS.map((s) => (
+                      <SocialRow key={s.name} s={s} />
+                    ))}
+                    <div className="socfoot dim">
+                      total {SOCIALS.length} symlinks · all destinations off-site
+                    </div>
                   </div>
-                </div>
+                </section>
 
-                <div className="spacer" />
+                {/* CONTACT */}
+                <section className="section">
+                  <Prompt cmd="cat /etc/contact" />
+                  <div className="out grid2">
+                    <div><span className="dim">irc      </span> TheZakMan @ freenode</div>
+                    <div><span className="dim">email    </span> thezakman<span className="dim">[at]</span>icloud.com</div>
+                    <div><span className="dim">timezone </span> UTC-3 / America/Sao_Paulo</div>
+                    <div><span className="dim">status   </span> <span className="ok">{'●'}</span> available for freelance</div>
+                  </div>
+                </section>
 
-                <Prompt cmd="cat about.txt" />
-                <div className="out">
-                  <p>I'm a <span className="hi">Graphic &amp; CGI Artist</span> that loves to play guitar and code in <span className="hi">python</span> <span className="heart">{'♥'}</span></p>
-                  <p>I have been on the internet since <span className="hi">1999</span>, learning and enjoying photos of cats.</p>
-                  <p className="dim">tags: art · cgi · music · code · cats · beer · crts · old-internet</p>
-                </div>
+                {/* NEOFETCH */}
+                <section className="section">
+                  <Prompt cmd="neofetch" />
+                  <NeofetchBlock />
+                </section>
 
-                <div className="spacer" />
-
-                <Prompt cmd="./donate --beer" />
-                <div className="out">
-                  <pre className="beer">{String.raw`
+                {/* DONATE */}
+                <section className="section">
+                  <Prompt cmd="./donate --beer" />
+                  <div className="out">
+                    <pre className="beer">{String.raw`
         .~~~~.
         i====i_
         |cccc|_)   "If you like my art or anything I do,
         |cccc|      send me a beer. I do most of my cool
         \__,/       stuff with a cold one." — tzm
 `}</pre>
-                  <a className="btn" href="https://www.paypal.com/donate?business=thezakman@icloud.com&amount=5&currency_code=USD" target="_blank" rel="noopener noreferrer">
-                    [ paypal · $5 · cheers {'🍺'} ]
-                  </a>
-                  <span className="dim"> {'←'} click to pour one</span>
-                </div>
-
-                <div className="spacer" />
-
-                <Prompt cmd="cat /etc/contact" />
-                <div className="out grid2">
-                  <div><span className="dim">irc      </span> TheZakMan @ freenode</div>
-                  <div><span className="dim">email    </span> thezakman<span className="dim">[at]</span>icloud.com</div>
-                  <div><span className="dim">timezone </span> UTC-3 / America/Sao_Paulo</div>
-                  <div><span className="dim">status   </span> <span className="ok">{'●'}</span> available for freelance</div>
-                </div>
-
-                <div className="spacer" />
-
-                <Prompt cmd="neofetch" />
-                <div className="out neofetch">
-                  <pre className="tinylogo">{String.raw`   _____ ____  __
-  /_  _//_  / /  |
-   / /   / / / /\|
-  /_/   /_/ /_/`}</pre>
-                  <div className="specs">
-                    <div><span className="dim">os       </span> tzm-os 25.04 (cyberspace)</div>
-                    <div><span className="dim">host     </span> thezakman.github.io</div>
-                    <div><span className="dim">kernel   </span> 6.9.1-vt323-glow</div>
-                    <div><span className="dim">shell    </span> tzm-sh 1.0</div>
-                    <div><span className="dim">resolution</span> 1024 {'×'} 768 (CRT)</div>
-                    <div><span className="dim">de       </span> phosphor + scanlines</div>
-                    <div><span className="dim">cpu      </span> heart {'×'} 1 @ 60bpm</div>
-                    <div><span className="dim">gpu      </span> caffeine + cold beer</div>
-                    <div><span className="dim">memory   </span> 17527 cat photos / {'∞'}</div>
-                    <div><span className="dim">uptime   </span> since 1999</div>
+                    <a className="btn" href="https://www.paypal.com/donate?business=thezakman@icloud.com&amount=5&currency_code=USD" target="_blank" rel="noopener noreferrer">
+                      [ paypal · $5 · cheers {'🍺'} ]
+                    </a>
                   </div>
-                </div>
+                </section>
 
-                <div className="spacer" />
-
-                <Prompt cmd="help" />
-                <div className="out cmds">
+                {/* COMMAND BAR */}
+                <div className="cmd-bar">
                   {CMDS.map(c => <CmdKbd key={c} cmd={c} onRun={runCommand} />)}
-                  <span className="dim"> · try typing or tapping one {'↓'}</span>
+                  <span className="dim">tap a command or type below</span>
                 </div>
 
-                <div className="spacer" />
-
+                {/* DYNAMIC HISTORY */}
                 {history.map((h, i) => {
-                  if (h.kind === 'echo') return <Prompt key={i} cmd={h.cmd} />;
+                  if (h.kind === 'echo') return <FullPrompt key={i} cmd={h.cmd} />;
                   if (h.kind === 'text') return <div key={i} className={`out ${h.warn ? 'warn' : ''}`}>{h.text}</div>;
                   if (h.kind === 'help') return (
-                    <div key={i} className="out cmds">
+                    <div key={i} className="out cmd-bar">
                       {CMDS.map(c => <CmdKbd key={c} cmd={c} onRun={runCommand} />)}
                     </div>
                   );
@@ -505,7 +553,7 @@ function App() {
                   );
                   if (h.kind === 'social') return (
                     <div key={i} className="out">
-                      {SOCIALS.map((s, j) => <SocialRow key={s.name} s={s} idx={j} />)}
+                      {SOCIALS.map((s) => <SocialRow key={s.name} s={s} />)}
                     </div>
                   );
                   if (h.kind === 'donate') return (
@@ -521,24 +569,7 @@ function App() {
                       <div><span className="dim">status   </span> <span className="ok">{'●'}</span> available for freelance</div>
                     </div>
                   );
-                  if (h.kind === 'hardware') return (
-                    <div key={i} className="out neofetch">
-                      <pre className="tinylogo">{String.raw`   _____ ____  __
-  /_  _//_  / /  |
-   / /   / / / /\|
-  /_/   /_/ /_/`}</pre>
-                      <div className="specs">
-                        <div><span className="dim">os       </span> tzm-os 25.04 (cyberspace)</div>
-                        <div><span className="dim">host     </span> thezakman.github.io</div>
-                        <div><span className="dim">kernel   </span> 6.9.1-vt323-glow</div>
-                        <div><span className="dim">shell    </span> tzm-sh 1.0</div>
-                        <div><span className="dim">cpu      </span> heart {'×'} 1 @ 60bpm</div>
-                        <div><span className="dim">gpu      </span> caffeine + cold beer</div>
-                        <div><span className="dim">memory   </span> 17527 cat photos / {'∞'}</div>
-                        <div><span className="dim">uptime   </span> since 1999</div>
-                      </div>
-                    </div>
-                  );
+                  if (h.kind === 'hardware') return <NeofetchBlock key={i} />;
                   if (h.kind === 'matrix') return <MatrixRain key={i} />;
                   if (h.kind === 'cats') return (
                     <div key={i} className="out">
@@ -553,6 +584,8 @@ function App() {
                   return null;
                 })}
 
+                {/* LIVE TERMINAL INPUT */}
+                <div className="spacer-sm" />
                 <div className="line live">
                   <span className="ps1"><span className="ps1-user">tzm</span><span className="ps1-at">@</span><span className="ps1-host">cyberspace</span><span className="ps1-colon">:</span><span className="ps1-path">~</span><span className="ps1-dollar">$</span></span>
                   <input
@@ -572,7 +605,7 @@ function App() {
                   <span className="cursor">{'█'}</span>
                 </div>
 
-                <div className="spacer big" />
+                <div className="spacer-lg" />
               </>
             )}
           </div>
@@ -585,6 +618,7 @@ function App() {
         </div>
       </div>
 
+      {/* Tweaks panel */}
       {window.TweaksPanel && (() => {
         const { TweaksPanel, TweakSection, TweakSlider, TweakToggle, TweakRadio, TweakSelect } = window;
         return (
@@ -626,44 +660,6 @@ function App() {
       })()}
     </div>
   );
-}
-
-/* ---------- matrix rain (easter egg) ---------- */
-function MatrixRain() {
-  const ref = useRef(null);
-  useEffect(() => {
-    const canvas = ref.current;
-    if (!canvas) return;
-    canvas.width = canvas.clientWidth * (window.devicePixelRatio || 1);
-    canvas.height = 200 * (window.devicePixelRatio || 1);
-    canvas.style.height = '200px';
-    const ctx = canvas.getContext('2d');
-    const dpr = window.devicePixelRatio || 1;
-    ctx.scale(dpr, dpr);
-    const w = canvas.clientWidth;
-    const h = 200;
-    const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ01THEZAKMAN'.split('');
-    const cols = Math.floor(w / 12);
-    const drops = Array(cols).fill(0).map(() => Math.random() * h);
-    let raf;
-    const draw = () => {
-      ctx.fillStyle = 'rgba(2, 9, 6, 0.18)';
-      ctx.fillRect(0, 0, w, h);
-      ctx.font = '16px VT323, monospace';
-      ctx.fillStyle = getComputedStyle(canvas).color;
-      for (let i = 0; i < drops.length; i++) {
-        const ch = chars[Math.floor(Math.random() * chars.length)];
-        ctx.fillText(ch, i * 12, drops[i]);
-        drops[i] += 14;
-        if (drops[i] > h && Math.random() > 0.96) drops[i] = 0;
-      }
-      raf = requestAnimationFrame(draw);
-    };
-    draw();
-    const stop = setTimeout(() => cancelAnimationFrame(raf), 6000);
-    return () => { cancelAnimationFrame(raf); clearTimeout(stop); };
-  }, []);
-  return <canvas className="matrix" ref={ref}></canvas>;
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root'));

@@ -19,13 +19,13 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* outer CRT housing */
+/* ====================== CRT HOUSING ====================== */
+
 .crt {
   position: relative;
   width: 100%;
   height: 100%;
-  background:
-    radial-gradient(ellipse at center, #0a0a0a 0%, #000 70%);
+  background: radial-gradient(ellipse at center, #0a0a0a 0%, #000 70%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -89,7 +89,8 @@ body {
 .bezel-tag .led.on { animation: ledpulse 2.4s ease-in-out infinite; }
 @keyframes ledpulse { 50% { opacity: 0.55; } }
 
-/* the actual screen */
+/* ====================== SCREEN & CRT FX ====================== */
+
 .screen {
   position: relative;
   flex: 1;
@@ -103,12 +104,10 @@ body {
   isolation: isolate;
 }
 
-/* CRT curvature */
 .crt.curved .screen {
   border-radius: 22px;
   transform: perspective(1200px) rotateX(0.6deg);
-  background:
-    radial-gradient(ellipse at center, var(--bg) 60%, #000 110%);
+  background: radial-gradient(ellipse at center, var(--bg) 60%, #000 110%);
 }
 .crt.curved .screen::before {
   content: '';
@@ -118,7 +117,6 @@ body {
   z-index: 9;
 }
 
-/* scanlines layer */
 .scanlines {
   position: absolute; inset: 0;
   pointer-events: none;
@@ -126,13 +124,11 @@ body {
     180deg,
     rgba(0,0,0,calc(var(--scanline-a) * 1)) 0px,
     rgba(0,0,0,calc(var(--scanline-a) * 1)) 1px,
-    transparent 1px,
-    transparent 3px
+    transparent 1px, transparent 3px
   );
   z-index: 8;
   mix-blend-mode: multiply;
 }
-
 .scanlines::after {
   content: '';
   position: absolute; left: 0; right: 0; height: 80px;
@@ -144,33 +140,26 @@ body {
   100% { transform: translateY(100vh); }
 }
 
-/* vignette */
 .vignette {
   position: absolute; inset: 0;
   pointer-events: none;
-  background:
-    radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.55) 100%);
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.55) 100%);
   z-index: 7;
 }
 
-/* RGB subpixel shimmer */
 .rgb {
   position: absolute; inset: 0;
   pointer-events: none;
   background: repeating-linear-gradient(
     90deg,
-    rgba(255,0,0,0.025) 0,
-    rgba(255,0,0,0.025) 1px,
-    rgba(0,255,0,0.025) 1px,
-    rgba(0,255,0,0.025) 2px,
-    rgba(0,0,255,0.025) 2px,
-    rgba(0,0,255,0.025) 3px
+    rgba(255,0,0,0.025) 0, rgba(255,0,0,0.025) 1px,
+    rgba(0,255,0,0.025) 1px, rgba(0,255,0,0.025) 2px,
+    rgba(0,0,255,0.025) 2px, rgba(0,0,255,0.025) 3px
   );
   z-index: 6;
   mix-blend-mode: screen;
 }
 
-/* flicker animation */
 .crt.flicker .screen {
   animation: flicker 0.16s infinite steps(2, end);
 }
@@ -180,7 +169,6 @@ body {
   100% { filter: brightness(1.02); }
 }
 
-/* jitter on text */
 .crt.jitter .terminal {
   animation: jitter 5.4s infinite;
 }
@@ -230,7 +218,6 @@ body {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in oklab, var(--fg) 40%, transparent) transparent;
 }
-
 .terminal::-webkit-scrollbar { width: 8px; }
 .terminal::-webkit-scrollbar-thumb {
   background: color-mix(in oklab, var(--fg) 40%, transparent);
@@ -256,9 +243,69 @@ body {
 .ps1-dollar { opacity: 0.7; margin-right: 4px; }
 .ps1-cmd    { color: var(--fg); }
 
-/* output blocks */
+/* ====================== PHOSPHOR IMAGE ====================== */
+
+.phosphor-img {
+  display: inline-block;
+  background-color: var(--fg);
+  -webkit-mask-image: var(--img);
+  mask-image: var(--img);
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  filter: drop-shadow(0 0 8px var(--glow)) drop-shadow(0 0 18px var(--glow));
+  transition: filter 0.3s ease;
+}
+
+.phosphor-img.logo-main {
+  width: 160px;
+  height: 140px;
+  flex-shrink: 0;
+}
+
+.phosphor-img.neofetch-logo {
+  width: 100px;
+  height: 88px;
+  flex-shrink: 0;
+}
+
+@supports not (mask-image: url('')) {
+  .phosphor-img {
+    background: transparent;
+  }
+  .phosphor-img img {
+    position: static !important;
+    opacity: 1 !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain;
+    filter: brightness(0.8) sepia(1) hue-rotate(var(--phosphor-hue, 90deg)) saturate(3);
+  }
+}
+
+/* ====================== SECTIONS ====================== */
+
+.section {
+  padding: 14px 0;
+  border-bottom: 1px solid color-mix(in oklab, var(--fg) 8%, transparent);
+}
+.section:last-of-type { border-bottom: none; }
+
+.section-hd {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  opacity: 0.5;
+  margin-bottom: 8px;
+}
+
+/* ====================== OUTPUT BLOCKS ====================== */
+
 .out {
-  padding: 4px 0 4px 0;
+  padding: 4px 0;
   margin-left: 0;
   line-height: 1.45;
 }
@@ -276,35 +323,35 @@ body {
 .warn{ color: color-mix(in oklab, #ff8866 70%, var(--fg) 30%); }
 .heart { color: #ff5fa1; text-shadow: 0 0 6px #ff5fa188; }
 
-.spacer { height: 14px; }
-.spacer.big { height: 80px; }
+/* ====================== BOOT ====================== */
 
-/* boot line */
 .boot { font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.55; }
 .boot .ok { color: color-mix(in oklab, var(--fg) 70%, white 30%); font-weight: 700; padding: 0 6px; }
 .boot .warn { color: #ffb070; padding: 0 6px; }
 .boot .trail { margin-left: 6px; }
 
-/* ===== ASCII LOGO ===== */
+.boot-skip-hint {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0;
+  animation: fadein 0.3s ease 0.8s forwards;
+  text-align: center;
+  padding-top: 20px;
+  cursor: pointer;
+}
+@keyframes fadein { to { opacity: 0.35; } }
+
+/* ====================== LOGO FRAME ====================== */
+
 .logo-frame {
   display: flex;
-  gap: 32px;
+  gap: 28px;
   align-items: center;
-  padding: 16px 0;
-  border-top: 1px dashed color-mix(in oklab, var(--fg) 25%, transparent);
+  padding: 20px 0;
   border-bottom: 1px dashed color-mix(in oklab, var(--fg) 25%, transparent);
-  margin: 12px 0;
-}
-.ascii {
-  font-family: 'VT323', monospace;
-  font-size: 13px;
-  line-height: 1;
-  white-space: pre;
-  color: color-mix(in oklab, var(--fg) 90%, white 10%);
-  opacity: 0.9;
-  text-shadow: var(--text-shadow);
-  letter-spacing: 0;
-  flex-shrink: 0;
+  margin-bottom: 8px;
 }
 .logo-tag { display: flex; flex-direction: column; gap: 6px; }
 .tag-big {
@@ -322,7 +369,8 @@ body {
   opacity: 0.85;
 }
 
-/* ===== SOCIAL ROWS ===== */
+/* ====================== SOCIAL ROWS ====================== */
+
 .socrow {
   display: grid;
   grid-template-columns:
@@ -350,7 +398,7 @@ body {
 .socrow:hover .name,
 .socrow:active .name { text-decoration: underline; }
 .socrow:hover::before {
-  content: '►';
+  content: '\25B6';
   position: absolute;
   left: -16px;
   color: var(--fg);
@@ -367,11 +415,24 @@ body {
 
 .socfoot { padding: 8px 0 4px; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
 
-/* ===== CLICKABLE COMMAND PILLS ===== */
+/* ====================== COMMAND BAR ====================== */
+
+.cmd-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 0;
+  border-top: 1px dashed color-mix(in oklab, var(--fg) 20%, transparent);
+}
+.cmd-bar .dim { margin-left: 4px; }
+
 .kbd {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 4px 12px;
-  margin: 3px 6px 3px 0;
+  margin: 2px 0;
   border: 1px solid color-mix(in oklab, var(--fg) 50%, transparent);
   border-radius: 3px;
   background: color-mix(in oklab, var(--fg) 8%, transparent);
@@ -380,8 +441,7 @@ body {
   cursor: pointer;
   user-select: none;
   text-transform: lowercase;
-  min-height: 32px;
-  line-height: 24px;
+  min-height: 34px;
   transition: background 80ms, transform 80ms;
 }
 .kbd:hover {
@@ -392,9 +452,8 @@ body {
   transform: scale(0.96);
 }
 
-.cmds { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
+/* ====================== BEER & DONATE ====================== */
 
-/* beer art */
 .beer {
   font-family: 'VT323', monospace;
   font-size: 14px;
@@ -403,9 +462,9 @@ body {
   margin: 6px 0;
 }
 
-/* button */
 .btn {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   padding: 8px 18px;
   margin: 6px 0;
   background: var(--fg);
@@ -419,26 +478,19 @@ body {
   border-radius: 2px;
   text-shadow: none;
   min-height: 44px;
-  line-height: 28px;
   box-shadow: 0 0 12px var(--glow), 0 0 24px color-mix(in oklab, var(--glow) 50%, transparent);
   transition: transform 80ms, box-shadow 80ms;
 }
 .btn:hover { transform: translate(-1px, -1px); box-shadow: 2px 2px 0 color-mix(in oklab, var(--fg) 70%, black 30%), 0 0 20px var(--glow); }
 .btn:active { transform: scale(0.97); }
 
-/* neofetch */
+/* ====================== NEOFETCH ====================== */
+
 .neofetch {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 24px;
   align-items: start;
-}
-.tinylogo {
-  font-family: 'VT323', monospace;
-  font-size: 22px;
-  line-height: 1;
-  color: var(--fg);
-  white-space: pre;
 }
 .specs {
   font-family: 'JetBrains Mono', monospace;
@@ -448,7 +500,8 @@ body {
   gap: 2px;
 }
 
-/* matrix canvas */
+/* ====================== MATRIX & CATS ====================== */
+
 .matrix {
   width: 100%;
   height: 200px;
@@ -458,7 +511,6 @@ body {
   border: 1px solid color-mix(in oklab, var(--fg) 30%, transparent);
 }
 
-/* cats art */
 .catart {
   font-family: 'VT323', monospace;
   font-size: 18px;
@@ -466,7 +518,8 @@ body {
   color: var(--fg);
 }
 
-/* live input */
+/* ====================== TERMINAL INPUT ====================== */
+
 .line.live { align-items: center; }
 .cmd-input {
   flex: 1;
@@ -490,16 +543,18 @@ body {
 }
 @keyframes cursorblink { 50% { opacity: 0; } }
 
+.spacer-sm { height: 8px; }
+.spacer-lg { height: 60px; }
+
 /* ====================== RESPONSIVE ====================== */
 
-/* tablets and small laptops */
 @media (max-width: 900px) {
   .crt { padding: 6px; }
   .bezel { padding: 10px 10px 36px; border-radius: 16px; }
   .statusbar { font-size: 9px; gap: 10px; padding: 8px 10px; }
   .terminal { padding: 12px 12px 60px; font-size: 17px; }
-  .ascii { display: none; }
   .tag-big { font-size: 44px; }
+  .phosphor-img.logo-main { width: 110px; height: 96px; }
   .socrow {
     grid-template-columns: 36px 110px 1fr;
     font-size: 12px;
@@ -513,11 +568,10 @@ body {
   .socrow.head { display: none; }
   .out.grid2 { grid-template-columns: 1fr; }
   .neofetch { grid-template-columns: 1fr; }
-  .tinylogo { display: none; }
+  .phosphor-img.neofetch-logo { display: none; }
   .bezel-tag { font-size: 9px; gap: 8px; }
 }
 
-/* phones */
 @media (max-width: 600px) {
   .crt { padding: 0; }
   .bezel {
@@ -541,35 +595,41 @@ body {
     padding-bottom: max(40px, env(safe-area-inset-bottom, 0px));
     font-size: 15px;
   }
-  .tag-big { font-size: 32px; }
+  .logo-frame {
+    flex-direction: column;
+    text-align: center;
+    align-items: center;
+    gap: 14px;
+  }
+  .tag-big { font-size: 36px; }
   .tag-sm { font-size: 10px; }
-  .logo-frame { gap: 12px; padding: 10px 0; }
+  .phosphor-img.logo-main { width: 80px; height: 70px; }
   .boot { font-size: 11px; }
+  .section { padding: 10px 0; }
+  .section-hd { font-size: 10px; }
   .socrow {
     grid-template-columns: 28px 1fr;
     font-size: 11px;
     padding: 10px 6px;
-    gap: 0 6px;
+    gap: 0 8px;
     min-height: 48px;
   }
   .socrow .name { display: none; }
   .socrow .handle { font-weight: 700; }
-  .kbd { font-size: 11px; padding: 6px 14px; min-height: 36px; line-height: 24px; }
+  .kbd { font-size: 11px; padding: 6px 14px; min-height: 38px; }
   .btn { font-size: 12px; padding: 10px 16px; }
   .beer { font-size: 12px; }
   .catart { font-size: 14px; }
   .specs { font-size: 11px; }
   .out.grid2 { gap: 2px 12px; }
-  .spacer { height: 10px; }
-  .spacer.big { height: 50px; }
   .bezel-tag { font-size: 7px; gap: 6px; bottom: 8px; }
   .bezel-tag .led { width: 6px; height: 6px; }
   .socfoot { font-size: 10px; }
 }
 
-/* very small phones */
 @media (max-width: 380px) {
   .terminal { font-size: 14px; padding: 8px 6px 30px; }
-  .tag-big { font-size: 26px; }
+  .tag-big { font-size: 28px; }
   .statusbar { font-size: 7px; gap: 4px; }
+  .phosphor-img.logo-main { width: 64px; height: 56px; }
 }
