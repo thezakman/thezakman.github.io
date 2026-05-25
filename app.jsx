@@ -59,6 +59,11 @@ function nowStr() {
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
 }
+function dateStr() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 function uptimeSince(start) {
   const s = Math.floor((Date.now() - start) / 1000);
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
@@ -123,8 +128,22 @@ function AsciiLogo() {
   );
 }
 
+function CmdKbd({ cmd, onRun }) {
+  return (
+    <span
+      className="kbd"
+      role="button"
+      tabIndex={0}
+      onClick={(e) => { e.stopPropagation(); onRun(cmd); }}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRun(cmd); } }}
+    >
+      {cmd}
+    </span>
+  );
+}
+
 function SocialRow({ s, idx, onFocus }) {
-  const date = '2026-05-25';
+  const date = dateStr();
   return (
     <a
       className="socrow"
@@ -132,6 +151,7 @@ function SocialRow({ s, idx, onFocus }) {
       target="_blank"
       rel="noopener noreferrer"
       onMouseEnter={() => onFocus && onFocus(idx)}
+      onTouchStart={() => onFocus && onFocus(idx)}
       data-idx={idx}
     >
       <span className="perms">lrwxrwxrwx</span>
@@ -142,7 +162,7 @@ function SocialRow({ s, idx, onFocus }) {
       <span className="date">{date}</span>
       <span className="glyph">[{s.glyph}]</span>
       <span className="name">{s.name}</span>
-      <span className="arrow">─►</span>
+      <span className="arrow">{'─►'}</span>
       <span className="handle">{s.handle}</span>
       <span className="url dim">{s.url.replace(/^https?:\/\//, '')}</span>
     </a>
@@ -158,11 +178,11 @@ function StatusBar({ bootStart, phosphor }) {
   return (
     <div className="statusbar">
       <span className="seg"><span className="dim">SYS</span> TZM-OS v25.04</span>
-      <span className="seg"><span className="dim">PID</span> {sysid}</span>
-      <span className="seg"><span className="dim">PHOSPHOR</span> {phosphor.toUpperCase()}</span>
+      <span className="seg hide-mobile"><span className="dim">PID</span> {sysid}</span>
+      <span className="seg hide-mobile"><span className="dim">PHOSPHOR</span> {phosphor.toUpperCase()}</span>
       <span className="seg"><span className="dim">LOAD</span> {load}</span>
       <span className="seg"><span className="dim">UP</span> {uptimeSince(bootStart)}</span>
-      <span className="seg right"><span className="dim">▮</span> {nowStr()}</span>
+      <span className="seg right"><span className="dim">{'▮'}</span> {nowStr()}</span>
     </div>
   );
 }
@@ -181,22 +201,28 @@ function App() {
 
   const [v, setTweak] = (window.useTweaks || ((d) => [d, () => {}]))(tweaksDefaults);
 
-  /* phase machine */
-  const [phase, setPhase] = useState('boot'); // boot → about → social → done
+  const [phase, setPhase] = useState('boot');
   const [bootStart] = useState(Date.now());
   const [bootDone, setBootDone] = useState(0);
   const totalBoot = 8;
 
-  /* commands history */
   const [history, setHistory] = useState([]);
   const [input, setInput] = useState('');
   const [focusedIdx, setFocusedIdx] = useState(-1);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
+  const cmdHistory = useRef([]);
+  const cmdHistoryIdx = useRef(-1);
 
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [history, phase, bootDone]);
+  const scrollToBottom = useCallback(() => {
+    if (scrollRef.current) {
+      requestAnimationFrame(() => {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      });
+    }
+  }, []);
+
+  useEffect(() => { scrollToBottom(); }, [history, phase, bootDone, scrollToBottom]);
 
   useEffect(() => {
     if (phase === 'boot' && bootDone >= totalBoot) {
@@ -205,15 +231,27 @@ function App() {
     }
   }, [bootDone, phase]);
 
-  /* focus input on click anywhere */
   useEffect(() => {
-    const focus = () => inputRef.current && inputRef.current.focus();
+    if (phase === 'done' && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [phase]);
+
+  useEffect(() => {
+    const focus = (e) => {
+      if (e.target.tagName === 'A' || e.target.closest('a') ||
+          e.target.tagName === 'BUTTON' || e.target.closest('button') ||
+          e.target.closest('.twk-panel')) return;
+      if (inputRef.current) inputRef.current.focus();
+    };
     window.addEventListener('click', focus);
-    focus();
-    return () => window.removeEventListener('click', focus);
+    window.addEventListener('touchend', focus);
+    return () => {
+      window.removeEventListener('click', focus);
+      window.removeEventListener('touchend', focus);
+    };
   }, []);
 
-  /* phosphor color map */
   const phosphorMap = {
     green:  { fg: '#39ff7a', bg: '#020906', glow: '#3fffa1' },
     amber:  { fg: '#ffb000', bg: '#0a0500', glow: '#ffd166' },
@@ -233,13 +271,18 @@ function App() {
     '--font-size': v.font === 'vt323' ? '20px' : '15px',
   };
 
-  /* command handler */
-  const runCommand = (raw) => {
+  const runCommand = useCallback((raw) => {
     const cmd = raw.trim();
     const echo = { kind: 'echo', cmd: raw };
     let out;
     const c = cmd.toLowerCase();
-    if (c === '' ) {
+
+    if (c !== '') {
+      cmdHistory.current.push(cmd);
+    }
+    cmdHistoryIdx.current = -1;
+
+    if (c === '') {
       setHistory(h => [...h, echo]);
       return;
     }
@@ -274,14 +317,34 @@ function App() {
       out = { kind: 'text', text: `tzm-sh: ${cmd}: command not found. try 'help'`, warn: true };
     }
     setHistory(h => [...h, echo, out]);
-  };
+  }, []);
 
   const handleKey = (e) => {
     if (e.key === 'Enter') {
       runCommand(input);
       setInput('');
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const hist = cmdHistory.current;
+      if (hist.length === 0) return;
+      const next = cmdHistoryIdx.current + 1;
+      if (next < hist.length) {
+        cmdHistoryIdx.current = next;
+        setInput(hist[hist.length - 1 - next]);
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (cmdHistoryIdx.current > 0) {
+        cmdHistoryIdx.current--;
+        setInput(cmdHistory.current[cmdHistory.current.length - 1 - cmdHistoryIdx.current]);
+      } else {
+        cmdHistoryIdx.current = -1;
+        setInput('');
+      }
     }
   };
+
+  const CMDS = ['about', 'social', 'donate', 'contact', 'neofetch', 'matrix', 'cats', 'date', 'clear'];
 
   return (
     <div className={`crt ph-${v.phosphor} font-${v.font} ${v.curvature ? 'curved' : ''} ${v.flicker ? 'flicker' : ''} ${v.jitter ? 'jitter' : ''}`} style={cssVars}>
@@ -294,7 +357,6 @@ function App() {
           <StatusBar bootStart={bootStart} phosphor={v.phosphor} />
 
           <div className="terminal" ref={scrollRef}>
-            {/* boot phase */}
             <div className="boot-block">
               <BootLine delay={50}   text="TZM-BIOS v25.04.18  © 1999-2026 TheZakMan Industries" onDone={() => setBootDone(b => Math.max(b,1))} />
               <BootLine delay={250}  text="CPU... Pentium IV @ 3.2GHz (overclocked w/ vibes)"   onDone={() => setBootDone(b => Math.max(b,2))} />
@@ -314,7 +376,7 @@ function App() {
                   <AsciiLogo />
                   <div className="logo-tag">
                     <span className="tag-big">TheZakMan</span>
-                    <span className="tag-sm">Graphic + CGI artist · plays guitar · codes in python ♥</span>
+                    <span className="tag-sm">Graphic + CGI artist · plays guitar · codes in python {'♥'}</span>
                     <span className="tag-sm dim">// signal from cyberspace since 1999</span>
                   </div>
                 </div>
@@ -323,7 +385,7 @@ function App() {
 
                 <Prompt cmd="whoami" />
                 <div className="out">
-                  <span>TheZakMan</span> <span className="dim">— Graphic &amp; CGI Artist · guitarist · python wrangler · cat-photo archivist · online since 1999</span>
+                  <span>TheZakMan</span> <span className="dim">{'—'} Graphic &amp; CGI Artist · guitarist · python wrangler · cat-photo archivist · online since 1999</span>
                 </div>
 
                 <div className="spacer" />
@@ -349,13 +411,13 @@ function App() {
                     <span className="name dim">NAME</span>
                     <span className="arrow dim"></span>
                     <span className="handle dim">HANDLE</span>
-                    <span className="url dim">→ TARGET</span>
+                    <span className="url dim">{'→'} TARGET</span>
                   </div>
                   {SOCIALS.map((s, i) => (
                     <SocialRow key={s.name} s={s} idx={i} onFocus={setFocusedIdx} />
                   ))}
                   <div className="socfoot dim">
-                    total {SOCIALS.length} symlinks · all destinations off-site · open with: <span className="kbd">click</span>
+                    total {SOCIALS.length} symlinks · all destinations off-site · open with: <CmdKbd cmd="click" onRun={() => {}} />
                   </div>
                 </div>
 
@@ -363,7 +425,7 @@ function App() {
 
                 <Prompt cmd="cat about.txt" />
                 <div className="out">
-                  <p>I'm a <span className="hi">Graphic &amp; CGI Artist</span> that loves to play guitar and code in <span className="hi">python</span> <span className="heart">♥</span></p>
+                  <p>I'm a <span className="hi">Graphic &amp; CGI Artist</span> that loves to play guitar and code in <span className="hi">python</span> <span className="heart">{'♥'}</span></p>
                   <p>I have been on the internet since <span className="hi">1999</span>, learning and enjoying photos of cats.</p>
                   <p className="dim">tags: art · cgi · music · code · cats · beer · crts · old-internet</p>
                 </div>
@@ -380,9 +442,9 @@ function App() {
         \__,/       stuff with a cold one." — tzm
 `}</pre>
                   <a className="btn" href="https://www.paypal.com/donate?business=thezakman@icloud.com&amount=5&currency_code=USD" target="_blank" rel="noopener noreferrer">
-                    [ paypal · $5 · cheers 🍺 ]
+                    [ paypal · $5 · cheers {'🍺'} ]
                   </a>
-                  <span className="dim"> ← click to pour one</span>
+                  <span className="dim"> {'←'} click to pour one</span>
                 </div>
 
                 <div className="spacer" />
@@ -392,7 +454,7 @@ function App() {
                   <div><span className="dim">irc      </span> TheZakMan @ freenode</div>
                   <div><span className="dim">email    </span> thezakman<span className="dim">[at]</span>icloud.com</div>
                   <div><span className="dim">timezone </span> UTC-3 / America/Sao_Paulo</div>
-                  <div><span className="dim">status   </span> <span className="ok">●</span> available for freelance</div>
+                  <div><span className="dim">status   </span> <span className="ok">{'●'}</span> available for freelance</div>
                 </div>
 
                 <div className="spacer" />
@@ -408,11 +470,11 @@ function App() {
                     <div><span className="dim">host     </span> thezakman.github.io</div>
                     <div><span className="dim">kernel   </span> 6.9.1-vt323-glow</div>
                     <div><span className="dim">shell    </span> tzm-sh 1.0</div>
-                    <div><span className="dim">resolution</span> 1024 × 768 (CRT)</div>
+                    <div><span className="dim">resolution</span> 1024 {'×'} 768 (CRT)</div>
                     <div><span className="dim">de       </span> phosphor + scanlines</div>
-                    <div><span className="dim">cpu      </span> heart × 1 @ 60bpm</div>
+                    <div><span className="dim">cpu      </span> heart {'×'} 1 @ 60bpm</div>
                     <div><span className="dim">gpu      </span> caffeine + cold beer</div>
-                    <div><span className="dim">memory   </span> 17527 cat photos / ∞</div>
+                    <div><span className="dim">memory   </span> 17527 cat photos / {'∞'}</div>
                     <div><span className="dim">uptime   </span> since 1999</div>
                   </div>
                 </div>
@@ -421,16 +483,8 @@ function App() {
 
                 <Prompt cmd="help" />
                 <div className="out cmds">
-                  <span className="kbd">about</span>
-                  <span className="kbd">social</span>
-                  <span className="kbd">donate</span>
-                  <span className="kbd">contact</span>
-                  <span className="kbd">neofetch</span>
-                  <span className="kbd">matrix</span>
-                  <span className="kbd">cats</span>
-                  <span className="kbd">date</span>
-                  <span className="kbd">clear</span>
-                  <span className="dim"> · try typing one ↓</span>
+                  {CMDS.map(c => <CmdKbd key={c} cmd={c} onRun={runCommand} />)}
+                  <span className="dim"> · try typing or tapping one {'↓'}</span>
                 </div>
 
                 <div className="spacer" />
@@ -440,15 +494,13 @@ function App() {
                   if (h.kind === 'text') return <div key={i} className={`out ${h.warn ? 'warn' : ''}`}>{h.text}</div>;
                   if (h.kind === 'help') return (
                     <div key={i} className="out cmds">
-                      <span className="kbd">about</span><span className="kbd">social</span><span className="kbd">donate</span>
-                      <span className="kbd">contact</span><span className="kbd">neofetch</span><span className="kbd">matrix</span>
-                      <span className="kbd">cats</span><span className="kbd">date</span><span className="kbd">clear</span>
+                      {CMDS.map(c => <CmdKbd key={c} cmd={c} onRun={runCommand} />)}
                     </div>
                   );
                   if (h.kind === 'about') return (
                     <div key={i} className="out">
-                      <p>I'm a <span className="hi">Graphic &amp; CGI Artist</span> that loves guitar and python <span className="heart">♥</span></p>
-                      <p>On the internet since <span className="hi">1999</span>. cat photos collected: ∞.</p>
+                      <p>I'm a <span className="hi">Graphic &amp; CGI Artist</span> that loves guitar and python <span className="heart">{'♥'}</span></p>
+                      <p>On the internet since <span className="hi">1999</span>. cat photos collected: {'∞'}.</p>
                     </div>
                   );
                   if (h.kind === 'social') return (
@@ -458,18 +510,33 @@ function App() {
                   );
                   if (h.kind === 'donate') return (
                     <div key={i} className="out">
-                      <a className="btn" href="https://www.paypal.com/donate?business=thezakman@icloud.com&amount=5&currency_code=USD" target="_blank" rel="noopener noreferrer">[ paypal · $5 · cheers 🍺 ]</a>
+                      <a className="btn" href="https://www.paypal.com/donate?business=thezakman@icloud.com&amount=5&currency_code=USD" target="_blank" rel="noopener noreferrer">[ paypal · $5 · cheers {'🍺'} ]</a>
                     </div>
                   );
                   if (h.kind === 'contact') return (
                     <div key={i} className="out grid2">
                       <div><span className="dim">irc      </span> TheZakMan @ freenode</div>
                       <div><span className="dim">email    </span> thezakman<span className="dim">[at]</span>icloud.com</div>
+                      <div><span className="dim">timezone </span> UTC-3 / America/Sao_Paulo</div>
+                      <div><span className="dim">status   </span> <span className="ok">{'●'}</span> available for freelance</div>
                     </div>
                   );
                   if (h.kind === 'hardware') return (
-                    <div key={i} className="out">
-                      <div><span className="dim">cpu</span> heart · <span className="dim">gpu</span> beer · <span className="dim">ram</span> ∞ cats</div>
+                    <div key={i} className="out neofetch">
+                      <pre className="tinylogo">{String.raw`   _____ ____  __
+  /_  _//_  / /  |
+   / /   / / / /\|
+  /_/   /_/ /_/`}</pre>
+                      <div className="specs">
+                        <div><span className="dim">os       </span> tzm-os 25.04 (cyberspace)</div>
+                        <div><span className="dim">host     </span> thezakman.github.io</div>
+                        <div><span className="dim">kernel   </span> 6.9.1-vt323-glow</div>
+                        <div><span className="dim">shell    </span> tzm-sh 1.0</div>
+                        <div><span className="dim">cpu      </span> heart {'×'} 1 @ 60bpm</div>
+                        <div><span className="dim">gpu      </span> caffeine + cold beer</div>
+                        <div><span className="dim">memory   </span> 17527 cat photos / {'∞'}</div>
+                        <div><span className="dim">uptime   </span> since 1999</div>
+                      </div>
                     </div>
                   );
                   if (h.kind === 'matrix') return <MatrixRain key={i} />;
@@ -486,7 +553,6 @@ function App() {
                   return null;
                 })}
 
-                {/* live prompt */}
                 <div className="line live">
                   <span className="ps1"><span className="ps1-user">tzm</span><span className="ps1-at">@</span><span className="ps1-host">cyberspace</span><span className="ps1-colon">:</span><span className="ps1-path">~</span><span className="ps1-dollar">$</span></span>
                   <input
@@ -498,9 +564,12 @@ function App() {
                     autoFocus
                     spellCheck={false}
                     autoComplete="off"
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    enterKeyHint="send"
                     aria-label="terminal input"
                   />
-                  <span className="cursor">█</span>
+                  <span className="cursor">{'█'}</span>
                 </div>
 
                 <div className="spacer big" />
@@ -509,7 +578,6 @@ function App() {
           </div>
         </div>
 
-        {/* bezel hardware decoration */}
         <div className="bezel-tag">
           <span className="led on"></span>
           <span className="brand">ZAKtron 1701</span>
@@ -517,7 +585,6 @@ function App() {
         </div>
       </div>
 
-      {/* Tweaks panel */}
       {window.TweaksPanel && (() => {
         const { TweaksPanel, TweakSection, TweakSlider, TweakToggle, TweakRadio, TweakSelect } = window;
         return (
@@ -567,23 +634,28 @@ function MatrixRain() {
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
-    canvas.width = canvas.clientWidth;
-    canvas.height = 200;
+    canvas.width = canvas.clientWidth * (window.devicePixelRatio || 1);
+    canvas.height = 200 * (window.devicePixelRatio || 1);
+    canvas.style.height = '200px';
     const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    ctx.scale(dpr, dpr);
+    const w = canvas.clientWidth;
+    const h = 200;
     const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ01THEZAKMAN'.split('');
-    const cols = Math.floor(canvas.width / 12);
-    const drops = Array(cols).fill(0).map(() => Math.random() * canvas.height);
+    const cols = Math.floor(w / 12);
+    const drops = Array(cols).fill(0).map(() => Math.random() * h);
     let raf;
     const draw = () => {
       ctx.fillStyle = 'rgba(2, 9, 6, 0.18)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, w, h);
       ctx.font = '16px VT323, monospace';
       ctx.fillStyle = getComputedStyle(canvas).color;
       for (let i = 0; i < drops.length; i++) {
         const ch = chars[Math.floor(Math.random() * chars.length)];
         ctx.fillText(ch, i * 12, drops[i]);
         drops[i] += 14;
-        if (drops[i] > canvas.height && Math.random() > 0.96) drops[i] = 0;
+        if (drops[i] > h && Math.random() > 0.96) drops[i] = 0;
       }
       raf = requestAnimationFrame(draw);
     };
