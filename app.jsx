@@ -149,16 +149,16 @@ function NeofetchBlock() {
     <div className="out neofetch">
       <PhosphorImage src="tzm.png" alt="tzm" className="neofetch-logo" />
       <div className="specs">
-        <div><span className="dim">os       </span> tzm-os 25.04 (cyberspace)</div>
+        <div><span className="dim">os       </span> tzm-os (cyberspace)</div>
         <div><span className="dim">host     </span> thezakman.github.io</div>
-        <div><span className="dim">kernel   </span> 6.9.1-vt323-glow</div>
+        <div><span className="dim">kernel   </span> 1.3.37-vt-glow</div>
         <div><span className="dim">shell    </span> tzm-sh 1.0</div>
         <div><span className="dim">resolution</span> 1024 {'×'} 768 (CRT)</div>
         <div><span className="dim">de       </span> phosphor + scanlines</div>
         <div><span className="dim">cpu      </span> heart {'×'} 1 @ 60bpm</div>
         <div><span className="dim">gpu      </span> caffeine + cold beer</div>
         <div><span className="dim">memory   </span> 17527 cat photos / {'∞'}</div>
-        <div><span className="dim">uptime   </span> since 1999</div>
+        <div><span className="dim">uptime   </span> since 1987</div>
       </div>
     </div>
   );
@@ -375,7 +375,7 @@ function App() {
       setTimeout(() => { if (inputRef.current) inputRef.current.focus(); }, 100);
       return;
     } else if (c === 'exit' || c === 'logout' || c === 'quit') {
-      out = { kind: 'text', text: "you can't leave the internet. you've been here since 1999." };
+      out = { kind: 'text', text: "you can't leave the internet. you've been here since 1987." };
     } else if (c.startsWith('sudo')) {
       out = { kind: 'text', text: `[sudo] password for ${c.slice(5) || 'guest'}: incorrect. try 'help'.`, warn: true };
     } else if (c === 'rm -rf /' || c === 'rm -rf') {
@@ -429,11 +429,11 @@ function App() {
             {/* === BOOT PHASE === */}
             {phase === 'boot' && (
               <div className="boot-block">
-                <BootLine delay={50}   text="TZM-BIOS v25.04.18  © 1999-2026 TheZakMan Industries" onDone={() => setBootDone(b => Math.max(b,1))} />
+                <BootLine delay={50}   text="TZM-BIOS v25.04.18  © 1987-2026 TheZakMan Industries" onDone={() => setBootDone(b => Math.max(b,1))} />
                 <BootLine delay={250}  text="CPU... Pentium IV @ 3.2GHz (overclocked w/ vibes)"   onDone={() => setBootDone(b => Math.max(b,2))} />
                 <BootLine delay={420}  text="Memory test ... 640K (should be enough for anybody)" onDone={() => setBootDone(b => Math.max(b,3))} />
                 <BootLine delay={650}  text="Detecting devices: guitar /dev/strat ... python /dev/snek" onDone={() => setBootDone(b => Math.max(b,4))} />
-                <BootLine delay={900}  text="Mounting /home/tzm ... loading cat photos archive (1999→)" onDone={() => setBootDone(b => Math.max(b,5))} />
+                <BootLine delay={900}  text="Mounting /home/tzm ... loading cat photos archive (1987→)" onDone={() => setBootDone(b => Math.max(b,5))} />
                 <BootLine delay={1150} text="Initializing CRT phosphor matrix ... aligning scanlines" onDone={() => setBootDone(b => Math.max(b,6))} />
                 <BootLine delay={1400} text="Network: IRC → freenode/#thezakman ... ONLINE" onDone={() => setBootDone(b => Math.max(b,7))} />
                 <BootLine delay={1650} text="Starting tzm-sh ... ready" onDone={() => setBootDone(b => Math.max(b,8))} />
@@ -497,7 +497,7 @@ function App() {
   ( o.o )   ( -.- )   ( ^.^ )   ( o.- )
    > ^ <     > ^ <     > ^ <     > ^ <
 `}</pre>
-                      <span className="dim">17527 cat photos archived since 1999.</span>
+                      <span className="dim">17527 cat photos archived since 1987.</span>
                     </div>
                   );
                   return null;
