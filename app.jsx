@@ -5,16 +5,15 @@ const { useState, useEffect, useRef, useMemo, useCallback } = React;
    ========================================================= */
 
 const SOCIALS = [
-  { glyph: 'T', name: 'tumblr',     handle: '@thezakman',     url: 'https://thezakman.tumblr.com/',                            kb: '4.2K' },
-  { glyph: '♫', name: 'soundcloud', handle: '/thezakman',     url: 'https://soundcloud.com/thezakman',                         kb: '12M'  },
-  { glyph: '▶', name: 'steam',      handle: 'thezakman87',    url: 'http://steamcommunity.com/id/thezakman87',                 kb: '888K' },
-  { glyph: 'R', name: 'reddit',     handle: 'u/thezakman87',  url: 'https://www.reddit.com/user/thezakman87/',                 kb: '666'  },
-  { glyph: '○', name: 'instagram',  handle: '@thezakman',     url: 'https://www.instagram.com/thezakman',                      kb: '3.1K' },
-  { glyph: '#', name: 'github',     handle: '@thezakman',     url: 'https://github.com/thezakman',                             kb: '92K'  },
-  { glyph: '$', name: 'gumroad',    handle: '/thezakman',     url: 'https://gumroad.com/thezakman',                            kb: '512'  },
-  { glyph: 'W', name: 'wordpress',  handle: '@thezakman',     url: 'https://thezakman.wordpress.com/',                         kb: '1.7K' },
-  { glyph: 'X', name: 'twitter',    handle: '@thezakman',     url: 'https://twitter.com/thezakman',                            kb: '8.0K' },
   { glyph: '@', name: 'upwork',     handle: '~freelancer',    url: 'https://www.upwork.com/freelancers/~013c497232fa2ab3ad',   kb: '256'  },
+  { glyph: '✦', name: 'portfolio',  handle: 'tzm.ink',        url: 'https://tzm.ink/',                                         kb: '4.2K' },
+  { glyph: '#', name: 'github',     handle: '@thezakman',     url: 'https://github.com/thezakman',                             kb: '92K'  },
+  { glyph: 'S', name: 'substack',   handle: '@thezakman',     url: 'https://thezakman.substack.com/',                          kb: '1.7K' },
+  { glyph: '○', name: 'instagram',  handle: '@thezakman',     url: 'https://www.instagram.com/thezakman',                      kb: '3.1K' },
+  { glyph: 'X', name: 'twitter',    handle: '@thezakman',     url: 'https://twitter.com/thezakman',                            kb: '8.0K' },
+  { glyph: '♫', name: 'soundcloud', handle: '/thezakman',     url: 'https://soundcloud.com/thezakman',                         kb: '12M'  },
+  { glyph: 'R', name: 'reddit',     handle: 'u/thezakman87',  url: 'https://www.reddit.com/user/thezakman87/',                 kb: '666'  },
+  { glyph: '▶', name: 'steam',      handle: 'thezakman87',    url: 'http://steamcommunity.com/id/thezakman87',                 kb: '888K' },
 ];
 
 const CMDS = ['about', 'social', 'donate', 'contact', 'neofetch', 'matrix', 'cats', 'date', 'clear'];
@@ -126,7 +125,8 @@ function CmdKbd({ cmd, onRun }) {
       className="kbd"
       role="button"
       tabIndex={0}
-      onClick={(e) => { e.stopPropagation(); onRun(cmd); }}
+      onClick={(e) => { e.preventDefault(); onRun(cmd); }}
+      onTouchEnd={(e) => { e.preventDefault(); onRun(cmd); }}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRun(cmd); } }}
     >
       {cmd}
@@ -135,20 +135,11 @@ function CmdKbd({ cmd, onRun }) {
 }
 
 function SocialRow({ s }) {
-  const date = dateStr();
   return (
     <a className="socrow" href={s.url} target="_blank" rel="noopener noreferrer">
-      <span className="perms">lrwxrwxrwx</span>
-      <span className="links">1</span>
-      <span className="owner">tzm</span>
-      <span className="group">www</span>
-      <span className="size">{s.kb.padStart(6, ' ')}</span>
-      <span className="date">{date}</span>
       <span className="glyph">[{s.glyph}]</span>
       <span className="name">{s.name}</span>
-      <span className="arrow">{'─►'}</span>
       <span className="handle">{s.handle}</span>
-      <span className="url dim">{s.url.replace(/^https?:\/\//, '')}</span>
     </a>
   );
 }
@@ -281,11 +272,12 @@ function App() {
   const cmdHistoryIdx = useRef(-1);
 
   const scrollToBottom = useCallback(() => {
-    if (scrollRef.current) {
-      requestAnimationFrame(() => {
+    if (!scrollRef.current) return;
+    setTimeout(() => {
+      if (scrollRef.current) {
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-      });
-    }
+      }
+    }, 50);
   }, []);
 
   useEffect(() => {
@@ -380,6 +372,7 @@ function App() {
       out = { kind: 'text', text: nowStr() };
     } else if (c === 'clear' || c === 'cls') {
       setHistory([]);
+      setTimeout(() => { if (inputRef.current) inputRef.current.focus(); }, 100);
       return;
     } else if (c === 'exit' || c === 'logout' || c === 'quit') {
       out = { kind: 'text', text: "you can't leave the internet. you've been here since 1999." };
@@ -391,6 +384,7 @@ function App() {
       out = { kind: 'text', text: `tzm-sh: ${cmd}: command not found. try 'help'`, warn: true };
     }
     setHistory(h => [...h, echo, out]);
+    setTimeout(() => { if (inputRef.current) inputRef.current.focus(); }, 100);
   }, []);
 
   const handleKey = (e) => {
@@ -450,91 +444,9 @@ function App() {
             {/* === MAIN CONTENT === */}
             {phase === 'done' && (
               <>
-                {/* LOGO + NAME */}
-                <div className="logo-frame">
-                  <PhosphorImage src="tzm.png" alt="TheZakMan logo" className="logo-main" />
-                  <div className="logo-tag">
-                    <span className="tag-big">TheZakMan</span>
-                    <span className="tag-sm">Graphic + CGI artist · plays guitar · codes in python {'♥'}</span>
-                    <span className="tag-sm dim">// signal from cyberspace since 1999</span>
-                  </div>
-                </div>
-
-                {/* ABOUT */}
-                <section className="section">
-                  <Prompt cmd="whoami" />
-                  <div className="out">
-                    <p>I'm a <span className="hi">Graphic &amp; CGI Artist</span> that loves to play guitar and code in <span className="hi">python</span> <span className="heart">{'♥'}</span></p>
-                    <p>I have been on the internet since <span className="hi">1999</span>, learning and enjoying photos of cats.</p>
-                    <p className="dim">tags: art · cgi · music · code · cats · beer · crts · old-internet</p>
-                  </div>
-                </section>
-
-                {/* SOCIAL LINKS */}
-                <section className="section">
-                  <Prompt cmd="ls -la /social" />
-                  <div className="out">
-                    <div className="socrow head">
-                      <span className="perms dim">PERMS</span>
-                      <span className="links dim">L</span>
-                      <span className="owner dim">USER</span>
-                      <span className="group dim">GROUP</span>
-                      <span className="size dim">SIZE</span>
-                      <span className="date dim">MTIME</span>
-                      <span className="glyph dim">GL</span>
-                      <span className="name dim">NAME</span>
-                      <span className="arrow dim"></span>
-                      <span className="handle dim">HANDLE</span>
-                      <span className="url dim">{'→'} TARGET</span>
-                    </div>
-                    {SOCIALS.map((s) => (
-                      <SocialRow key={s.name} s={s} />
-                    ))}
-                    <div className="socfoot dim">
-                      total {SOCIALS.length} symlinks · all destinations off-site
-                    </div>
-                  </div>
-                </section>
-
-                {/* CONTACT */}
-                <section className="section">
-                  <Prompt cmd="cat /etc/contact" />
-                  <div className="out grid2">
-                    <div><span className="dim">irc      </span> TheZakMan @ freenode</div>
-                    <div><span className="dim">email    </span> thezakman<span className="dim">[at]</span>icloud.com</div>
-                    <div><span className="dim">timezone </span> UTC-3 / America/Sao_Paulo</div>
-                    <div><span className="dim">status   </span> <span className="ok">{'●'}</span> available for freelance</div>
-                  </div>
-                </section>
-
                 {/* NEOFETCH */}
-                <section className="section">
-                  <Prompt cmd="neofetch" />
-                  <NeofetchBlock />
-                </section>
-
-                {/* DONATE */}
-                <section className="section">
-                  <Prompt cmd="./donate --beer" />
-                  <div className="out">
-                    <pre className="beer">{String.raw`
-        .~~~~.
-        i====i_
-        |cccc|_)   "If you like my art or anything I do,
-        |cccc|      send me a beer. I do most of my cool
-        \__,/       stuff with a cold one." — tzm
-`}</pre>
-                    <a className="btn" href="https://www.paypal.com/donate?business=thezakman@icloud.com&amount=5&currency_code=USD" target="_blank" rel="noopener noreferrer">
-                      [ paypal · $5 · cheers {'🍺'} ]
-                    </a>
-                  </div>
-                </section>
-
-                {/* COMMAND BAR */}
-                <div className="cmd-bar">
-                  {CMDS.map(c => <CmdKbd key={c} cmd={c} onRun={runCommand} />)}
-                  <span className="dim">tap a command or type below</span>
-                </div>
+                <FullPrompt cmd="neofetch" />
+                <NeofetchBlock />
 
                 {/* DYNAMIC HISTORY */}
                 {history.map((h, i) => {
@@ -558,6 +470,13 @@ function App() {
                   );
                   if (h.kind === 'donate') return (
                     <div key={i} className="out">
+                      <pre className="beer">{String.raw`
+        .~~~~.
+        i====i_
+        |cccc| |   "If you like my art or anything I do,
+        |cccc|_/    send me a beer. I do most of my cool
+        \___,/      stuff with a cold one." — tzm
+`}</pre>
                       <a className="btn" href="https://www.paypal.com/donate?business=thezakman@icloud.com&amount=5&currency_code=USD" target="_blank" rel="noopener noreferrer">[ paypal · $5 · cheers {'🍺'} ]</a>
                     </div>
                   );
@@ -584,37 +503,41 @@ function App() {
                   return null;
                 })}
 
-                {/* LIVE TERMINAL INPUT */}
-                <div className="spacer-sm" />
-                <div className="line live">
-                  <span className="ps1"><span className="ps1-user">tzm</span><span className="ps1-at">@</span><span className="ps1-host">cyberspace</span><span className="ps1-colon">:</span><span className="ps1-path">~</span><span className="ps1-dollar">$</span></span>
-                  <input
-                    ref={inputRef}
-                    className="cmd-input"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={handleKey}
-                    autoFocus
-                    spellCheck={false}
-                    autoComplete="off"
-                    autoCapitalize="off"
-                    autoCorrect="off"
-                    enterKeyHint="send"
-                    aria-label="terminal input"
-                  />
-                  <span className="cursor">{'█'}</span>
-                </div>
-
-                <div className="spacer-lg" />
               </>
             )}
           </div>
+
+          {/* FIXED BOTTOM: cmd-bar + input */}
+          {phase === 'done' && (
+            <div className="screen-bottom">
+              <div className="cmd-bar">
+                {CMDS.map(c => <CmdKbd key={c} cmd={c} onRun={runCommand} />)}
+              </div>
+              <div className="line live">
+                <span className="ps1"><span className="ps1-user">tzm</span><span className="ps1-at">@</span><span className="ps1-host">cyberspace</span><span className="ps1-colon">:</span><span className="ps1-path">~</span><span className="ps1-dollar">$</span></span>
+                <input
+                  ref={inputRef}
+                  className="cmd-input"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKey}
+                  autoFocus
+                  spellCheck={false}
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  enterKeyHint="send"
+                  aria-label="terminal input"
+                />
+                <span className="cursor">{'█'}</span>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="bezel-tag">
           <span className="led on"></span>
-          <span className="brand">ZAKtron 1701</span>
-          <span className="model">14" monochrome · 60 Hz · 1999</span>
+          <span className="copyleft">since 1987 / (c) TheZakMan</span>
         </div>
       </div>
 
