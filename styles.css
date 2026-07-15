@@ -496,28 +496,22 @@ body {
     linear-gradient(87deg,  transparent 68.1%, rgba(220,238,255,0.012) 68.2%, transparent 68.3%);
 }
 
-/* four dead, one stuck on — every CRT this old has them */
+/* Dead phosphor. Positions are rolled per session in JS — see DeadPixels.
+   The dark ones only announce themselves when text runs under them; the
+   stuck one burns on its own. */
 .deadpix {
   position: absolute; inset: 0;
   pointer-events: none;
   z-index: 13;
 }
-.deadpix::before {
-  content: '';
-  position: absolute; top: 0; left: 0;
-  width: 2px; height: 2px;
+.deadpix .px {
+  position: absolute;
   border-radius: 50%;
-  background: rgba(0,0,0,0.9);
-  box-shadow:
-    18vw 34vh 0 rgba(0,0,0,0.9),
-    63vw 21vh 0 rgba(0,0,0,0.85),
-    41vw 74vh 0 rgba(0,0,0,0.9),
-    86vw 58vh 0 rgba(0,0,0,0.8);
 }
-.deadpix::after {
-  content: '';
-  position: absolute; top: 41vh; left: 71vw;
-  width: 2px; height: 2px;
+.deadpix .px.dead {
+  background: rgba(0, 0, 0, 0.88);
+}
+.deadpix .px.stuck {
   background: var(--fg);
   box-shadow: 0 0 3px var(--glow), 0 0 7px var(--glow);
   opacity: 0.85;

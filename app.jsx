@@ -75,6 +75,41 @@ function phosphorShadow(glow, bloom, converge, color) {
   return layers.join(', ');
 }
 
+/* Where the phosphor gave up. Rolled once per session and held in a ref,
+   so the specks stay put while you use the terminal but no two visits get
+   the same damaged tube. Kept off the extreme edges, where the vignette
+   would swallow them. */
+function rollDeadPixels(n = 5) {
+  const px = [];
+  for (let i = 0; i < n; i++) {
+    px.push({
+      x: 5 + Math.random() * 90,
+      y: 8 + Math.random() * 84,
+      /* exactly one stuck-on speck: the dark ones only show over text,
+         so without it the damage would be invisible on a black screen */
+      stuck: i === 0,
+      size: Math.random() < 0.25 ? 3 : 2,
+    });
+  }
+  return px;
+}
+
+function DeadPixels() {
+  const px = useRef(null);
+  if (px.current === null) px.current = rollDeadPixels();
+  return (
+    <div className="deadpix">
+      {px.current.map((p, i) => (
+        <span
+          key={i}
+          className={`px ${p.stuck ? 'stuck' : 'dead'}`}
+          style={{ left: `${p.x}%`, top: `${p.y}%`, width: p.size, height: p.size }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function rndHex(len = 8) {
   const c = '0123456789ABCDEF';
   let s = '';
@@ -588,7 +623,7 @@ function App() {
             <>
               <div className="dust"></div>
               <div className="smudge"></div>
-              <div className="deadpix"></div>
+              <DeadPixels />
             </>
           )}
 
