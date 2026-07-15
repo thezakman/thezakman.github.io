@@ -740,13 +740,26 @@ const ASCII_RAMP = ' .:-=+*#%@';
 
 const shade = (v) => ASCII_RAMP[v <= 0 ? 0 : v >= 1 ? 9 : (v * 10) | 0];
 
+/* Every effect rolls its own numbers at construction. Hard-code the
+   frequencies and speeds and two plasmas are identical to the pixel — the
+   pick is random but what you get isn't, and drawing the same effect twice
+   in a session looks like the thing is stuck. Only the stateful ones used
+   to vary, and only because their seed happened to come from Math.random. */
+const rnd = (lo, hi) => lo + Math.random() * (hi - lo);
+const rsign = () => (Math.random() < 0.5 ? -1 : 1);
+const rpick = (a) => a[(Math.random() * a.length) | 0];
+
 /* Demoscene coordinates: y spans -0.5..0.5, and x spans -hw..hw where hw
    is the half-width in those same units, so nothing comes out an ellipse.
    Effects get hw because the tube is wide and its exact width depends on
    the viewport — anything placing its features at fixed offsets either
-   huddles in the middle of the screen or walks straight off the edge. */
-function field(fn) {
+   huddles in the middle of the screen or walks straight off the edge.
+
+   Takes a factory, not a function: it's called once per instance so the
+   effect can roll its constants before any pixel is drawn. */
+function field(makeFn) {
   return (W, H) => {
+    const fn = makeFn();
     const hw = W / (H * 4);
     return (t) => {
       let out = '';
@@ -768,13 +781,14 @@ function field(fn) {
 function fireDemo(W, H) {
   const h = H + 1;
   const buf = new Float32Array(W * h);
+  const density = rnd(0.72, 0.95), cool = rnd(0.075, 0.15), spread = rnd(0.6, 1);
   return () => {
-    for (let i = 0; i < W; i++) buf[(h - 1) * W + i] = Math.random() < 0.88 ? 1 : 0.35;
+    for (let i = 0; i < W; i++) buf[(h - 1) * W + i] = Math.random() < density ? 1 : 0.35;
     for (let j = 0; j < h - 1; j++) {
       for (let i = 0; i < W; i++) {
-        const drift = ((Math.random() * 3) | 0) - 1;
+        const drift = Math.random() < spread ? ((Math.random() * 3) | 0) - 1 : 0;
         const si = Math.min(W - 1, Math.max(0, i + drift));
-        const v = buf[(j + 1) * W + si] - Math.random() * 0.11;
+        const v = buf[(j + 1) * W + si] - Math.random() * cool;
         buf[j * W + i] = v > 0 ? v : 0;
       }
     }
@@ -793,8 +807,9 @@ function lifeDemo(W, H) {
   const N = W * H;
   let a = new Uint8Array(N), b = new Uint8Array(N);
   let acc = 0, gen = 0, lastPop = -1, stale = 0;
+  const density = rnd(0.18, 0.4), rate = rnd(60, 130);
   const seed = () => {
-    for (let i = 0; i < N; i++) a[i] = Math.random() < 0.28 ? 1 : 0;
+    for (let i = 0; i < N; i++) a[i] = Math.random() < density ? 1 : 0;
     gen = 0; stale = 0; lastPop = -1;
   };
   seed();
@@ -820,7 +835,7 @@ function lifeDemo(W, H) {
   };
   return (t, dt) => {
     acc += dt;
-    while (acc > 85) { step(); acc -= 85; }
+    while (acc > rate) { step(); acc -= rate; }
     let out = '';
     for (let j = 0; j < H; j++) {
       for (let i = 0; i < W; i++) out += a[j * W + i] ? '#' : ' ';
@@ -836,10 +851,14 @@ function caDemo(rule, seedRandom) {
   return (W, H) => {
     const rows = [];
     const first = new Uint8Array(W);
-    if (seedRandom) for (let i = 0; i < W; i++) first[i] = Math.random() < 0.5 ? 1 : 0;
-    else first[W >> 1] = 1;
+    /* A single seed in the middle of a fixed rule is fully deterministic —
+       every visit gets a pixel-identical run. Move the seed and vary how far
+       it's wound on, and the window lands somewhere different each time. */
+    if (seedRandom) for (let i = 0; i < W; i++) first[i] = Math.random() < rnd(0.3, 0.7) ? 1 : 0;
+    else first[((W * rnd(0.25, 0.75)) | 0)] = 1;
     rows.push(first);
     let acc = 0;
+    const rate = rnd(38, 75);
     const next = () => {
       const p = rows[rows.length - 1];
       const n = new Uint8Array(W);
@@ -854,10 +873,10 @@ function caDemo(rule, seedRandom) {
        tube it spends its first several seconds as a small triangle adrift
        in the middle. Pre-roll enough generations for the pattern to reach
        both edges before anyone sees it. */
-    if (!seedRandom) for (let i = 0; i < W; i++) next();
+    if (!seedRandom) { const n = W + ((rnd(0, 1.2) * W) | 0); for (let i = 0; i < n; i++) next(); }
     return (t, dt) => {
       acc += dt;
-      while (acc > 55) { next(); acc -= 55; }
+      while (acc > rate) { next(); acc -= rate; }
       const pad = H - rows.length;
       let out = '';
       for (let j = 0; j < H; j++) {
@@ -891,7 +910,10 @@ function tenPrintDemo(W, H) {
 function cubeDemo(W, H) {
   const V = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];
   const E = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
-  const scale = H * 0.36;
+  const scale = H * rnd(0.3, 0.4);
+  /* not sa/sb — the inner scope binds those to sin(a)/sin(b) */
+  const spinA = rnd(0.45, 1.0) * rsign(), spinB = rnd(0.3, 0.7) * rsign();
+  const pa = rnd(0, 6.3), pb = rnd(0, 6.3);
   /* A cube is square, so one of them fills the height and leaves most of a
      21:9 tube empty. Three, out of phase, is what a demo would have done
      with the room. */
@@ -904,7 +926,7 @@ function cubeDemo(W, H) {
     };
     for (let c = 0; c < N; c++) {
       const cx = W * (c + 0.5) / N;
-      const a = t * 0.7 + c * 1.1, b = t * 0.47 + c * 0.6;
+      const a = t * spinA + c * 1.1 + pa, b = t * spinB + c * 0.6 + pb;
       const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
       const p = V.map(([x, y, z]) => {
         const X = x * ca - z * sa;
@@ -934,13 +956,14 @@ function cubeDemo(W, H) {
 /* ---- actual particles this time. The per-pixel attempt at this hashed
    the angle into lanes and came out as scattered noise. ---- */
 function starDemo(W, H) {
-  const N = Math.max(60, ((W * H) / 7) | 0);
+  const N = Math.max(60, ((W * H) / rnd(5, 11)) | 0);
+  const warp = rnd(0.00028, 0.0007);
   const s = Array.from({ length: N }, () => ({
     x: Math.random() * 2 - 1, y: Math.random() * 2 - 1, z: Math.random() * 0.98 + 0.02,
   }));
   return (t, dt) => {
     const g = new Array(W * H).fill(' ');
-    const step = Math.min(60, dt) * 0.00042;
+    const step = Math.min(60, dt) * warp;
     for (const p of s) {
       p.z -= step;
       if (p.z <= 0.02) { p.x = Math.random() * 2 - 1; p.y = Math.random() * 2 - 1; p.z = 1; }
@@ -959,14 +982,17 @@ function starDemo(W, H) {
 /* ---- Lorenz. The trail decays like phosphor, which is the whole point of
    drawing it here. ---- */
 function lorenzDemo(W, H) {
-  let x = 0.1, y = 0, z = 0;
+  let x = rnd(-0.2, 0.2) || 0.1, y = rnd(-0.2, 0.2), z = rnd(0, 0.4);
+  /* stay inside the chaotic regime — rho below ~24.7 and it just spirals
+     into a fixed point and stops being an attractor worth watching */
+  const SIG = rnd(9, 11), RHO = rnd(26, 32), BETA = rnd(2.4, 3.0);
   const trail = new Float32Array(W * H);
   return (t, dt) => {
     for (let i = 0; i < trail.length; i++) trail[i] *= 0.982;
     const n = Math.min(180, Math.max(20, (dt * 4) | 0));
     for (let s = 0; s < n; s++) {
       const h = 0.005;
-      const dx = 10 * (y - x), dy = x * (28 - z) - y, dz = x * y - (8 / 3) * z;
+      const dx = SIG * (y - x), dy = x * (RHO - z) - y, dz = x * y - BETA * z;
       x += dx * h; y += dy * h; z += dz * h;
       const xi = Math.round(W / 2 + x * (W / 62));
       const yi = Math.round(H - 1 - z * (H / 52));
@@ -985,7 +1011,8 @@ function lorenzDemo(W, H) {
    about ten thousand steps. Worth the wait. ---- */
 function antDemo(W, H) {
   const g = new Uint8Array(W * H);
-  let x = W >> 1, y = H >> 1, dir = 0;   // 0=up 1=right 2=down 3=left
+  let x = (W >> 1) + ((rnd(-0.2, 0.2) * W) | 0), y = (H >> 1) + ((rnd(-0.2, 0.2) * H) | 0);
+  let dir = (Math.random() * 4) | 0;     // 0=up 1=right 2=down 3=left
   const DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
   let acc = 0;
   return (t, dt) => {
@@ -1014,12 +1041,16 @@ function donutDemo(W, H) {
   const LUM = '.,-~:;=!*#$@';
   const zbuf = new Float32Array(W * H);
   const out = new Array(W * H);
-  const R1 = 1, R2 = 2, K2 = 5;
-  const K1 = H * 0.92;   // sized off the height: a donut is round, not wide
+  const R1 = rnd(0.75, 1.15), R2 = rnd(1.7, 2.3), K2 = 5;
+  const K1 = H * rnd(0.8, 1.0);   // sized off the height: a donut is round, not wide
+  /* not sA/sB: the inner scope already binds those to sin(A)/sin(B), and
+     shadowing them puts the line below in the temporal dead zone */
+  const spinA = rnd(0.55, 1.25) * rsign(), spinB = rnd(0.3, 0.75) * rsign();
+  const phA = rnd(0, 6.3), phB = rnd(0, 6.3);
   return (t) => {
     zbuf.fill(0);
     out.fill(' ');
-    const A = t * 0.9, B = t * 0.45;
+    const A = t * spinA + phA, B = t * spinB + phB;
     const cA = Math.cos(A), sA = Math.sin(A), cB = Math.cos(B), sB = Math.sin(B);
     for (let th = 0; th < 6.283; th += 0.06) {
       const ct = Math.cos(th), st = Math.sin(th);
@@ -1053,9 +1084,11 @@ function donutDemo(W, H) {
    multiply per pixel. ---- */
 function rotozoomDemo(W, H) {
   const hw = W / (H * 4);
+  const spin = rnd(0.3, 0.9) * rsign(), zc = rnd(18, 34), zr = rnd(10, 24);
+  const zs = rnd(0.25, 0.6), mask = rpick([15, 31, 31, 63]), ph = rnd(0, 6.3);
   return (t) => {
-    const a = t * 0.55;
-    const z = 26 + Math.sin(t * 0.42) * 20;
+    const a = t * spin + ph;
+    const z = zc + Math.sin(t * zs) * zr;
     const ca = Math.cos(a) * z, sa = Math.sin(a) * z;
     let s = '';
     for (let j = 0; j < H; j++) {
@@ -1064,7 +1097,7 @@ function rotozoomDemo(W, H) {
         const x = (i / (W - 1) - 0.5) * hw * 2;
         const u = (x * ca - y * sa) | 0;
         const v = (x * sa + y * ca) | 0;
-        s += shade(((u ^ v) & 31) / 31);
+        s += shade(((u ^ v) & mask) / mask);
       }
       s += '\n';
     }
@@ -1077,18 +1110,20 @@ function scrollerDemo(W, H) {
   const MSG = '   ***   T H E Z A K M A N   ///   T Z M - O S   ***   '
             + 'GREETINGS TO EVERYONE STILL RUNNING A TUBE   ...   '
             + 'ONLINE SINCE THE PHOSPHOR WAS WARM   ...   ';
-  let off = 0;
+  let off = rnd(0, 200);
+  const spd = rnd(0.008, 0.016), waveK = rnd(0.035, 0.08), waveS = rnd(1.3, 2.6) * rsign();
+  const ampF = rnd(0.24, 0.4);
   return (t, dt) => {
-    off += dt * 0.011;
+    off += dt * spd;
     const grid = new Array(W * H).fill(' ');
     /* A long, shallow wave. Step the phase hard per column and neighbouring
        letters land rows apart, which scatters the message into confetti —
        the point of a scroller is that you can still read it. */
-    const amp = H * 0.34;
+    const amp = H * ampF;
     for (let i = 0; i < W; i++) {
       const ch = MSG[(((off + i) | 0) % MSG.length + MSG.length) % MSG.length];
       if (ch === ' ') continue;
-      const y = Math.round(H / 2 - 0.5 + Math.sin(i * 0.055 + t * 1.9) * amp);
+      const y = Math.round(H / 2 - 0.5 + Math.sin(i * waveK + t * waveS) * amp);
       if (y >= 0 && y < H) grid[y * W + i] = ch;
     }
     let s = '';
@@ -1103,11 +1138,12 @@ function scrollerDemo(W, H) {
    column instead of a ribbon, because at any angle two of them are behind
    the other two and span the same x. ---- */
 function twisterDemo(W, H) {
-  const R = Math.min(W * 0.17, H * 1.7);
+  const R = Math.min(W * rnd(0.12, 0.2), H * rnd(1.3, 2));
+  const spd = rnd(1.1, 2.4) * rsign(), twist = rnd(0.14, 0.4) * rsign(), ph = rnd(0, 6.3);
   return (t) => {
     const grid = new Array(W * H).fill(' ');
     for (let j = 0; j < H; j++) {
-      const a = t * 1.7 + j * 0.26;
+      const a = t * spd + j * twist + ph;
       for (let k = 0; k < 4; k++) {
         const th1 = a + k * Math.PI / 2;
         const th2 = th1 + Math.PI / 2;
@@ -1134,12 +1170,15 @@ function twisterDemo(W, H) {
    with the phase advancing per row, which is what makes the column of bars
    snake. ---- */
 function kefrensDemo(W, H) {
+  const s1 = rnd(1.4, 2.8) * rsign(), s2 = rnd(0.8, 1.8) * rsign();
+  const w1 = rnd(0.18, 0.4), w2 = rnd(0.06, 0.18);
+  const a1 = rnd(0.26, 0.4), a2 = rnd(0.04, 0.12);
+  const half = Math.max(3, (W * rnd(0.03, 0.07)) | 0);
   return (t) => {
     const grid = new Array(W * H).fill(' ');
-    const half = Math.max(3, (W * 0.045) | 0);
     for (let j = 0; j < H; j++) {
-      const cx = W / 2 + Math.sin(t * 2.1 + j * 0.28) * (W * 0.36)
-                       + Math.sin(t * 1.3 + j * 0.11) * (W * 0.08);
+      const cx = W / 2 + Math.sin(t * s1 + j * w1) * (W * a1)
+                       + Math.sin(t * s2 + j * w2) * (W * a2);
       for (let d = -half; d <= half; d++) {
         const x = Math.round(cx + d);
         if (x < 0 || x >= W) continue;
@@ -1178,22 +1217,23 @@ function voxelDemo(W, H) {
     smooth(x * 0.58, y * 0.58) * 0.17
   );
 
-  let cam = 0;
+  let cam = rnd(0, 400);
+  const speed = rnd(0.011, 0.03), eye = rnd(3.6, 5.0), fov = rnd(3.4, 5.2);
   const ybuf = new Int32Array(W);
   return (t, dt) => {
-    cam += dt * 0.019;
+    cam += dt * speed;
     const grid = new Array(W * H).fill(' ');
     ybuf.fill(H);
     const horizon = H * 0.26;
     /* The camera has to sit above the terrain. Let the height reach the eye
        and the nearest slice — where 1/z is largest — projects clean off the
        top of the screen and floods every column with the closest shade. */
-    const EYE = 4.2;
+    const EYE = eye;
     for (let z = 1.6; z < 46; z += 0.4) {
       const invz = 26 / z;
       const fog = Math.max(0.12, 1 - z / 46);
       for (let i = 0; i < W; i++) {
-        const wx = ((i - W / 2) / W) * z * 4.2;
+        const wx = ((i - W / 2) / W) * z * fov;
         const h = height(wx + 64, cam + z);
         const yScreen = Math.floor(horizon + (EYE - h) * invz);
         const top = Math.max(0, yScreen);
@@ -1218,15 +1258,16 @@ function waterDemo(W, H) {
   const N = W * H;
   let cur = new Float32Array(N), prev = new Float32Array(N);
   let acc = 0, nextDrop = 0;
+  const damp = rnd(0.962, 0.984), rate = rnd(18, 46), amp = rnd(1.2, 2.2);
   const drop = () => {
     const x = 2 + ((Math.random() * (W - 4)) | 0);
     const y = 2 + ((Math.random() * (H - 4)) | 0);
     for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) cur[(y + dy) * W + (x + dx)] = 1.6;
+      for (let dx = -1; dx <= 1; dx++) cur[(y + dy) * W + (x + dx)] = amp;
     }
     /* rarely: drops on top of each other never resolve into rings, they
        just keep the surface at a permanent chop */
-    nextDrop = 26 + Math.random() * 44;
+    nextDrop = rate * rnd(0.6, 1.5);
   };
   drop();
   const step = () => {
@@ -1235,7 +1276,7 @@ function waterDemo(W, H) {
       for (let x = 1; x < W - 1; x++) {
         const i = y * W + x;
         const v = (cur[i - 1] + cur[i + 1] + cur[i - W] + cur[i + W]) / 2 - prev[i];
-        prev[i] = v * 0.972;             // a little loss, or it never settles
+        prev[i] = v * damp;              // a little loss, or it never settles
       }
     }
     const tmp = cur; cur = prev; prev = tmp;
@@ -1256,15 +1297,16 @@ function waterDemo(W, H) {
 /* ---- copper bars. The Amiga's copper could change colour mid-scanline, so
    every demo opened with these. In one phosphor they're brightness. ---- */
 function rasterbarsDemo(W, H) {
-  const BARS = 5;
+  const BARS = 3 + ((Math.random() * 5) | 0);
+  const base = rnd(0.55, 1.1), spread = rnd(0.1, 0.32), off = rnd(0.8, 1.9);
+  const w = rnd(1.6, 3.4), dir = rsign();
   return (t) => {
     let s = '';
     for (let j = 0; j < H; j++) {
       let v = 0;
       for (let k = 0; k < BARS; k++) {
-        const c = H / 2 - 0.5 + Math.sin(t * (0.85 + k * 0.19) + k * 1.25) * (H / 2 - 0.5);
+        const c = H / 2 - 0.5 + Math.sin(t * dir * (base + k * spread) + k * off) * (H / 2 - 0.5);
         const d = Math.abs(j - c);
-        const w = 2.4;
         if (d < w) v = Math.max(v, (1 - d / w) ** 0.65);
       }
       s += shade(v).repeat(W) + '\n';
@@ -1279,11 +1321,37 @@ function grayScottDemo(W, H) {
   const N = W * H;
   const A = new Float32Array(N).fill(1), B = new Float32Array(N);
   const A2 = new Float32Array(N), B2 = new Float32Array(N);
-  const F = 0.0545, K = 0.062, DA = 1.0, DB = 0.5;
+  /* F/K is what the pattern *is*, so fixing it makes every run identical.
+     But most of the parameter space is lethal or saturating, and a textbook
+     name is no guarantee: the classic "mitosis" pair dies out entirely at
+     this grid size, and another held for 150 frames before collapsing —
+     which is worse, since it empties while you're watching it.
+
+     The seeding has to be matched to the regime, not shared. There is no
+     single seed that works for all of them: the canonical A=0.5/B=0.25 is
+     what keeps the low-feed pairs alive, and it kills the high-feed ones
+     outright, every single run. Seeding harder doesn't help either — flood
+     the grid with B and it eats all the A and the whole field starves.
+
+     Each row below was measured at its own seeding over 60 random layouts:
+     zero deaths, none saturating. Two of them died on roughly one seed in
+     ten under the shared seed, which a single trial never caught. */
+  const [F, K, seedA, seedB] = rpick([
+    [0.0545, 0.0620, null, 1],     // worms
+    [0.0300, 0.0565, 0.5, 0.25],   // solitons
+    [0.0780, 0.0610, null, 1],     // chaos
+    [0.0580, 0.0650, null, 1],     // sparse spots
+    [0.0340, 0.0618, 0.5, 0.25],   // slow coral
+  ]);
+  const DA = 1.0, DB = 0.5;
   for (let s = 0; s < 14; s++) {
     const cx = (Math.random() * W) | 0, cy = (Math.random() * H) | 0;
     for (let dy = -2; dy <= 2; dy++) {
-      for (let dx = -3; dx <= 3; dx++) B[(((cy + dy) + H) % H) * W + (((cx + dx) + W) % W)] = 1;
+      for (let dx = -3; dx <= 3; dx++) {
+        const i = (((cy + dy) + H) % H) * W + (((cx + dx) + W) % W);
+        B[i] = seedB;
+        if (seedA !== null) A[i] = seedA;
+      }
     }
   }
   /* The weighted 9-point Laplacian, not a bare 5-point one with -4 in the
@@ -1319,91 +1387,139 @@ function grayScottDemo(W, H) {
 
 const DEMOS = [
   /* --- fields --- */
-  { name: 'plasma', make: field((x, y, t) => (
-      Math.sin(x * 4 + t) + Math.sin(y * 5 - t * 0.8)
-      + Math.sin((x + y) * 3 + t * 1.2) + Math.sin(Math.hypot(x, y) * 7 - t * 1.7) + 4) / 8) },
+  { name: 'plasma', make: field(() => {
+      const a = rnd(2.5, 5.5), b = rnd(3.5, 6.5), c = rnd(2, 4.5), d = rnd(5, 9);
+      const s1 = rnd(0.7, 1.5) * rsign(), s2 = rnd(0.5, 1.1) * rsign();
+      const s3 = rnd(0.9, 1.6) * rsign(), s4 = rnd(1.2, 2.2) * rsign();
+      const p1 = rnd(0, 6.3), p2 = rnd(0, 6.3);
+      return (x, y, t) => (
+        Math.sin(x * a + t * s1 + p1) + Math.sin(y * b + t * s2)
+        + Math.sin((x + y) * c + t * s3 + p2) + Math.sin(Math.hypot(x, y) * d + t * s4) + 4) / 8;
+    }) },
 
-  { name: 'tunnel', make: field((x, y, t) => {
-      const r = Math.hypot(x, y) + 1e-3;
-      const v = Math.sin(0.5 / r * 5 + t * 3) * 0.5 + Math.sin(Math.atan2(y, x) * 6 - t) * 0.5;
-      return (v + 1) / 2 * Math.min(1, r * 3.5);
+  { name: 'tunnel', make: field(() => {
+      const depth = rnd(0.35, 0.7), rings = rnd(3.5, 7), arms = (rnd(4, 9) | 0);
+      const zs = rnd(2, 4) * rsign(), as = rnd(0.6, 1.6) * rsign();
+      return (x, y, t) => {
+        const r = Math.hypot(x, y) + 1e-3;
+        const v = Math.sin(depth / r * rings + t * zs) * 0.5
+                + Math.sin(Math.atan2(y, x) * arms + t * as) * 0.5;
+        return (v + 1) / 2 * Math.min(1, r * 3.5);
+      };
     }) },
 
   /* the blobs are sized in y-units but spread across x, so they have to
      ride hw or they drift off the side of a wide tube */
-  { name: 'metaballs', make: field((x, y, t, hw) => {
-      let s = 0;
-      for (let i = 0; i < 5; i++) {
-        const bx = Math.sin(t * (0.7 + i * 0.23) + i * 2.1) * hw * 0.78;
-        const by = Math.cos(t * (0.5 + i * 0.31) + i * 1.3) * 0.32;
-        s += 0.05 / ((x - bx) ** 2 + (y - by) ** 2 + 0.004);
-      }
-      return Math.min(1, s * 0.6);
+  { name: 'metaballs', make: field(() => {
+      const n = 3 + ((Math.random() * 4) | 0);
+      const b = Array.from({ length: n }, (_, i) => ({
+        sx: rnd(0.45, 0.95), sy: rnd(0.2, 0.4),
+        fx: rnd(0.4, 1.1) * rsign(), fy: rnd(0.3, 0.9) * rsign(),
+        px: rnd(0, 6.3), py: rnd(0, 6.3),
+      }));
+      const gain = rnd(0.024, 0.042);
+      return (x, y, t, hw) => {
+        let s = 0;
+        for (const o of b) {
+          const bx = Math.sin(t * o.fx + o.px) * hw * o.sx;
+          const by = Math.cos(t * o.fy + o.py) * o.sy;
+          s += gain / ((x - bx) ** 2 + (y - by) ** 2 + 0.003);
+        }
+        return Math.min(1, s * 0.6);
+      };
     }) },
 
-  { name: 'ripples', make: field((x, y, t, hw) => {
-      let s = 0;
-      for (let i = 0; i < 4; i++) {
-        const d = Math.hypot(x - Math.sin(i * 2.3 + 1) * hw * 0.8, y - Math.cos(i * 3.1) * 0.34);
-        s += Math.sin(d * 16 - t * 4 + i) / (1 + d * 1.6);
-      }
-      /* crests only — a trough landing on mid-grey paints the background flat */
-      return Math.max(0, s);
+  { name: 'ripples', make: field(() => {
+      const n = 2 + ((Math.random() * 4) | 0);
+      const src = Array.from({ length: n }, () => ({
+        x: rnd(-0.85, 0.85), y: rnd(-0.38, 0.38), ph: rnd(0, 6.3),
+      }));
+      const k = rnd(11, 22), spd = rnd(2.5, 5.5) * rsign(), fall = rnd(1.2, 2.4);
+      return (x, y, t, hw) => {
+        let s = 0;
+        for (const o of src) {
+          const d = Math.hypot(x - o.x * hw, y - o.y);
+          s += Math.sin(d * k - t * spd + o.ph) / (1 + d * fall);
+        }
+        /* crests only — a trough landing on mid-grey paints the background flat */
+        return Math.max(0, s);
+      };
     }) },
 
-  { name: 'moire', make: field((x, y, t, hw) => {
-      const o = Math.sin(t * 0.6) * hw * 0.5;
-      return (Math.sin(Math.hypot(x - o, y) * 22) * Math.sin(Math.hypot(x + o, y) * 22) + 1) / 2;
+  { name: 'moire', make: field(() => {
+      const k = rnd(16, 30), sep = rnd(0.3, 0.62), spd = rnd(0.35, 0.9) * rsign();
+      return (x, y, t, hw) => {
+        const o = Math.sin(t * spd) * hw * sep;
+        return (Math.sin(Math.hypot(x - o, y) * k) * Math.sin(Math.hypot(x + o, y) * k) + 1) / 2;
+      };
     }) },
 
-  { name: 'vortex', make: field((x, y, t) => {
-      const r = Math.hypot(x, y);
-      return (Math.sin((Math.atan2(y, x) + r * 4 - t * 1.5) * 3) * Math.cos(r * 8 - t * 2) + 1) / 2;
+  { name: 'vortex', make: field(() => {
+      const twist = rnd(2.5, 6), arms = (rnd(2, 5) | 0), rings = rnd(6, 11);
+      const s1 = rnd(1, 2.2) * rsign(), s2 = rnd(1.3, 2.6) * rsign();
+      return (x, y, t) => {
+        const r = Math.hypot(x, y);
+        return (Math.sin((Math.atan2(y, x) + r * twist - t * s1) * arms) * Math.cos(r * rings - t * s2) + 1) / 2;
+      };
     }) },
 
-  { name: 'mandelbrot', make: field((x, y, t) => {
-      /* orbit a known-interesting point so the zoom never lands on a void */
-      const zoom = Math.pow(2, 1 + ((t * 0.22) % 7));
-      const cx = -0.743643887 + x * 3 / zoom;
-      const cy = 0.131825904 + y * 3 / zoom;
-      let zr = 0, zi = 0, i = 0;
-      while (zr * zr + zi * zi < 4 && i < 70) {
-        const tr = zr * zr - zi * zi + cx;
-        zi = 2 * zr * zi + cy; zr = tr; i++;
-      }
-      return i >= 70 ? 0 : (i / 70) ** 0.55;
+  { name: 'mandelbrot', make: field(() => {
+      /* orbit one of several known-interesting points so the zoom never
+         lands on a void, but not the same one every time */
+      const [ox, oy] = rpick([
+        [-0.743643887, 0.131825904], [-0.16, 1.0405], [-1.25066, 0.02012],
+        [0.001643721971153, 0.822467633298876], [-0.7453, 0.1127],
+      ]);
+      const spd = rnd(0.16, 0.3), start = rnd(0, 7), MAX = 60 + ((Math.random() * 30) | 0);
+      return (x, y, t) => {
+        const zoom = Math.pow(2, 1 + ((start + t * spd) % 7));
+        const cx = ox + x * 3 / zoom, cy = oy + y * 3 / zoom;
+        let zr = 0, zi = 0, i = 0;
+        while (zr * zr + zi * zi < 4 && i < MAX) {
+          const tr = zr * zr - zi * zi + cx;
+          zi = 2 * zr * zi + cy; zr = tr; i++;
+        }
+        return i >= MAX ? 0 : (i / MAX) ** 0.55;
+      };
     }) },
 
-  { name: 'julia', make: field((x, y, t) => {
+  { name: 'julia', make: field(() => {
       /* c walks the cardioid, so the set breathes instead of just sitting.
          The body is drawn solid and the escape time is curved hard: mapping
          it linearly against 60 iterations puts almost every outside point in
          the first ramp step, which leaves the set as a thin outline on
          black — dark inside, dark outside, and only the boundary visible. */
-      const MAX = 42;
-      const cr = 0.7885 * Math.cos(t * 0.32), ci = 0.7885 * Math.sin(t * 0.32);
-      let zr = x * 1.5, zi = y * 1.5, i = 0;
-      while (zr * zr + zi * zi < 4 && i < MAX) {
-        const tr = zr * zr - zi * zi + cr;
-        zi = 2 * zr * zi + ci; zr = tr; i++;
-      }
-      return i >= MAX ? 1 : (i / MAX) ** 0.35;
+      const MAX = 36 + ((Math.random() * 16) | 0);
+      const rad = rnd(0.72, 0.8), spd = rnd(0.2, 0.45) * rsign();
+      const ph = rnd(0, 6.3), zoom = rnd(1.25, 1.8);
+      return (x, y, t) => {
+        const cr = rad * Math.cos(t * spd + ph), ci = rad * Math.sin(t * spd + ph);
+        let zr = x * zoom, zi = y * zoom, i = 0;
+        while (zr * zr + zi * zi < 4 && i < MAX) {
+          const tr = zr * zr - zi * zi + cr;
+          zi = 2 * zr * zi + ci; zr = tr; i++;
+        }
+        return i >= MAX ? 1 : (i / MAX) ** 0.35;
+      };
     }) },
 
-  { name: 'boing', make: field((x, y, t, hw) => {
+  { name: 'boing', make: field(() => {
       /* the Amiga ball: checkered sphere, spinning as it goes */
-      const bx = Math.sin(t * 1.2) * (hw - 0.36);
-      const by = 0.16 - Math.abs(Math.sin(t * 2.0)) * 0.32;
-      const dx = x - bx, dy = y - by, R = 0.33;
-      const r = Math.hypot(dx, dy);
-      if (r > R) return 0;
-      const nz = Math.sqrt(1 - (r / R) ** 2);
-      const u = Math.atan2(dx / R, nz) + t * 2.2;
-      const v = Math.asin(Math.max(-1, Math.min(1, dy / R)));
-      const check = (Math.floor(u * 2.4) + Math.floor(v * 3.2)) & 1;
-      /* a little shading so it reads as a ball and not a disc */
-      const lit = 0.55 + nz * 0.45;
-      return (check ? 0.95 : 0.4) * lit;
+      const R = rnd(0.26, 0.36), sx = rnd(0.9, 1.6), sy = rnd(1.6, 2.6);
+      const spin = rnd(1.4, 3) * rsign(), cu = rnd(1.8, 3.2), cv = rnd(2.4, 4.2);
+      return (x, y, t, hw) => {
+        const bx = Math.sin(t * sx) * (hw - R - 0.03);
+        const by = 0.16 - Math.abs(Math.sin(t * sy)) * 0.32;
+        const dx = x - bx, dy = y - by;
+        const r = Math.hypot(dx, dy);
+        if (r > R) return 0;
+        const nz = Math.sqrt(1 - (r / R) ** 2);
+        const u = Math.atan2(dx / R, nz) + t * spin;
+        const v = Math.asin(Math.max(-1, Math.min(1, dy / R)));
+        const check = (Math.floor(u * cu) + Math.floor(v * cv)) & 1;
+        /* a little shading so it reads as a ball and not a disc */
+        return (check ? 0.95 : 0.4) * (0.55 + nz * 0.45);
+      };
     }) },
 
   /* --- everything that needs to remember something --- */
