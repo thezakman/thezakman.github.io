@@ -23,8 +23,9 @@ const CMDS = ['about', 'social', 'donate', 'contact', 'neofetch', 'matrix', 'cat
 /* Everything tab-completable, including what the button bar doesn't show. */
 const COMPLETIONS = [
   'about', 'beer', 'cats', 'clear', 'contact', 'date', 'degauss', 'donate',
-  'exit', 'hardware', 'help', 'irc', 'ls', 'ls -la', 'matrix', 'neofetch',
-  'poweroff', 'shutdown', 'social', 'specs', 'whoami',
+  'exit', 'hardware', 'help', 'irc', 'ls', 'ls -la', 'matrix', 'mute',
+  'neofetch', 'poweroff', 'shutdown', 'social', 'sound', 'specs', 'unmute',
+  'whoami',
 ];
 
 /* ==================== helpers ==================== */
@@ -123,6 +124,140 @@ function rndHex(len = 8) {
   let s = '';
   for (let i = 0; i < len; i++) s += c[Math.floor(Math.random() * 16)];
   return s;
+}
+
+/* ==================== the noise a tube makes ====================
+   A powered CRT is never silent: the flyback transformer sings at the
+   horizontal scan rate (15.734kHz on NTSC — which is the joke, since
+   most adults have lost the top of their hearing and won't catch it),
+   the mains hums underneath, and the degauss coil goes wooomp.
+
+   All of it hangs off the power state, so the whine dies with the tube.
+   Off by default and only ever built from a real click: nobody's landing
+   page gets to make noise uninvited. */
+
+function useCrtSound(enabled, volume) {
+  const rig = useRef(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+
+    const ctx = new Ctx();
+    const master = ctx.createGain();
+    master.gain.value = volume;
+    master.connect(ctx.destination);
+
+    const tone = (type, freq, gain) => {
+      const osc = ctx.createOscillator();
+      osc.type = type;
+      osc.frequency.value = freq;
+      const g = ctx.createGain();
+      g.gain.value = 0;
+      osc.connect(g);
+      g.connect(master);
+      osc.start();
+      return { osc, gain: g, level: gain };
+    };
+
+    /* Sine, not triangle: every harmonic of a 15.734kHz wave lands above
+       the Nyquist limit of any real output device, so the band-limited
+       oscillator strips them and hands back a sine anyway — just 19%
+       quieter (8/π²). At this frequency a sine is the only thing that
+       physically survives sampling. */
+    const whine = tone('sine', 15734, 0.02);  // flyback
+    const hum   = tone('sine', 60, 0.008);    // mains
+
+    rig.current = { ctx, master, whine, hum };
+    return () => {
+      try { whine.osc.stop(); hum.osc.stop(); ctx.close(); } catch (e) { /* already gone */ }
+      rig.current = null;
+    };
+  }, [enabled]);
+
+  useEffect(() => {
+    const a = rig.current;
+    if (a) a.master.gain.value = volume;
+  }, [volume, enabled]);
+
+  /* the tube stops singing when it stops scanning */
+  const setPowered = useCallback((on) => {
+    const a = rig.current;
+    if (!a) return;
+    a.ctx.resume();
+    const t = a.ctx.currentTime;
+    for (const v of [a.whine, a.hum]) {
+      v.gain.gain.cancelScheduledValues(t);
+      v.gain.gain.setValueAtTime(v.gain.gain.value, t);
+      v.gain.gain.linearRampToValueAtTime(on ? v.level : 0, t + (on ? 0.5 : 0.12));
+    }
+  }, []);
+
+  /* the coil: mains frequency, wobbled and decaying, with a relay clack */
+  const degaussSound = useCallback(() => {
+    const a = rig.current;
+    if (!a) return;
+    const { ctx, master } = a;
+    a.ctx.resume();
+    const t = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(62, t);
+    osc.frequency.exponentialRampToValueAtTime(48, t + 1.1);
+
+    const lfo = ctx.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.value = 6.5;
+    const lfoDepth = ctx.createGain();
+    lfoDepth.gain.value = 12;
+    lfo.connect(lfoDepth);
+    lfoDepth.connect(osc.frequency);
+
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.5, t + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.15);
+
+    osc.connect(g);
+    g.connect(master);
+    osc.start(t); osc.stop(t + 1.2);
+    lfo.start(t); lfo.stop(t + 1.2);
+  }, []);
+
+  /* the static crack of the raster snapping to a point */
+  const powerOffSound = useCallback(() => {
+    const a = rig.current;
+    if (!a) return;
+    const { ctx, master } = a;
+    a.ctx.resume();
+    const t = ctx.currentTime;
+
+    const len = Math.floor(ctx.sampleRate * 0.12);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 6);
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 2600;
+    bp.Q.value = 0.7;
+
+    const g = ctx.createGain();
+    g.gain.value = 0.35;
+
+    src.connect(bp);
+    bp.connect(g);
+    g.connect(master);
+    src.start(t);
+  }, []);
+
+  return { setPowered, degaussSound, powerOffSound };
 }
 
 /* ==================== type-on hook ==================== */
@@ -339,6 +474,8 @@ function App() {
     "burnin": 0.55,
     "deadpix": 0.2,
     "grime": true,
+    "sound": false,
+    "volume": 0.5,
     "flicker": true,
     "jitter": true,
     "font": "vt323"
@@ -370,24 +507,36 @@ function App() {
 
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
+  const sound = useCrtSound(v.sound, v.volume);
+
   const degauss = useCallback(() => {
     setDegaussing(true);
+    sound.degaussSound();
     after(1100, () => setDegaussing(false));
-  }, [after]);
+  }, [after, sound]);
 
   const powerOff = useCallback(() => {
     setCollapsing(true);
+    sound.powerOffSound();
+    sound.setPowered(false);
     after(620, () => { setPower('off'); setCollapsing(false); });
-  }, [after]);
+  }, [after, sound]);
 
   const powerOn = useCallback(() => {
     setPower('on');
+    sound.setPowered(true);
     degauss();
     after(60, () => { if (inputRef.current) inputRef.current.focus(); });
-  }, [after, degauss]);
+  }, [after, degauss, sound]);
 
   /* the tube degausses when it warms up, like every CRT ever made */
   useEffect(() => { degauss(); }, []);
+
+  /* switching sound on mid-session: the tube is already scanning, so it
+     should already be singing — don't wait for the next power cycle */
+  useEffect(() => {
+    if (v.sound) sound.setPowered(power === 'on');
+  }, [v.sound, power, sound]);
 
   /* any input wakes a sleeping monitor */
   useEffect(() => {
@@ -546,6 +695,12 @@ function App() {
     } else if (c === 'degauss') {
       degauss();
       out = { kind: 'text', text: 'degaussing coil energized ... field collapsed.' };
+    } else if (c === 'sound' || c === 'mute' || c === 'unmute') {
+      const on = c === 'mute' ? false : c === 'unmute' ? true : !v.sound;
+      setTweak('sound', on);
+      out = { kind: 'text', text: on
+        ? 'flyback at 15.734kHz. if you hear nothing, the tube is fine — your ears are just older than it.'
+        : 'tube muted.' };
     } else if (c === 'exit' || c === 'logout' || c === 'quit' || c === 'poweroff' || c === 'shutdown') {
       setHistory(h => [...h, echo, { kind: 'text', text: 'signal lost. (the shell is still running — wake it with any key)' }]);
       after(420, powerOff);
@@ -559,7 +714,7 @@ function App() {
     }
     setHistory(h => [...h, echo, out]);
     setTimeout(() => { if (inputRef.current) inputRef.current.focus(); }, 100);
-  }, [after, degauss, powerOff]);
+  }, [after, degauss, powerOff, v.sound, setTweak]);
 
   const handleKey = (e) => {
     if (e.key === 'Enter') {
@@ -768,6 +923,13 @@ function App() {
           <span className="copyleft">since 1987 / (c) TheZakMan</span>
           <span className="hw-controls">
             <button
+              className={`hw-btn ${v.sound ? 'lit' : ''}`}
+              onClick={() => setTweak('sound', !v.sound)}
+              title={v.sound ? 'Mute the tube' : 'Let the tube sing (15.7kHz flyback)'}
+              aria-label={v.sound ? 'Mute the monitor' : 'Unmute the monitor'}
+              aria-pressed={v.sound}
+            >{v.sound ? '♪' : '⃠'}</button>
+            <button
               className="hw-btn"
               onClick={degauss}
               disabled={power === 'off'}
@@ -815,6 +977,10 @@ function App() {
               <TweakToggle label="Jitter" value={v.jitter} onChange={(x) => setTweak('jitter', x)} />
               <TweakToggle label="Dust & wear" value={v.grime} onChange={(x) => setTweak('grime', x)} />
               <TweakSlider label="Dead pixel odds" value={v.deadpix} min={0} max={1} step={0.05} onChange={(x) => setTweak('deadpix', x)} />
+            </TweakSection>
+            <TweakSection title="Sound">
+              <TweakToggle label="Flyback whine" value={v.sound} onChange={(x) => setTweak('sound', x)} />
+              <TweakSlider label="Volume" value={v.volume} min={0} max={1} step={0.05} onChange={(x) => setTweak('volume', x)} />
             </TweakSection>
             <TweakSection title="Typography">
               <TweakRadio

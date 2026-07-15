@@ -884,6 +884,10 @@ body {
   padding: 3px 8px;
   line-height: 1;
 }
+.hw-btn.lit {
+  color: var(--fg);
+  text-shadow: 0 0 4px var(--glow);
+}
 
 /* ====================== COMMAND BAR ====================== */
 
