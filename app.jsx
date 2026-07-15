@@ -1152,6 +1152,171 @@ function kefrensDemo(W, H) {
   };
 }
 
+/* ---- voxel landscape, Comanche-style: march away from the camera, and for
+   each column keep the highest thing drawn so far. Painting front-to-back
+   with that y-buffer is what hides the valleys behind the ridges without
+   ever sorting anything. ---- */
+function voxelDemo(W, H) {
+  const N = 128;
+  const seed = new Float32Array(N * N);
+  for (let i = 0; i < N * N; i++) seed[i] = Math.random();
+  const at = (x, y) => seed[((y & (N - 1)) * N) + (x & (N - 1))];
+  const smooth = (x, y) => {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    const xf = x - xi, yf = y - yi;
+    const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+    return at(xi, yi) * (1 - u) * (1 - v) + at(xi + 1, yi) * u * (1 - v)
+         + at(xi, yi + 1) * (1 - u) * v + at(xi + 1, yi + 1) * u * v;
+  };
+  /* Amplitude matters more than it looks: the noise only spans 0..1, and
+     once 1/z shrinks it that's under a row of relief — a flat floor with a
+     depth gradient painted on it. Frequency likewise, or the ridges are
+     wider than the screen and nothing varies across x. */
+  const height = (x, y) => 3.1 * (
+    smooth(x * 0.13, y * 0.13) * 0.55 +
+    smooth(x * 0.29, y * 0.29) * 0.28 +
+    smooth(x * 0.58, y * 0.58) * 0.17
+  );
+
+  let cam = 0;
+  const ybuf = new Int32Array(W);
+  return (t, dt) => {
+    cam += dt * 0.019;
+    const grid = new Array(W * H).fill(' ');
+    ybuf.fill(H);
+    const horizon = H * 0.26;
+    /* The camera has to sit above the terrain. Let the height reach the eye
+       and the nearest slice — where 1/z is largest — projects clean off the
+       top of the screen and floods every column with the closest shade. */
+    const EYE = 4.2;
+    for (let z = 1.6; z < 46; z += 0.4) {
+      const invz = 26 / z;
+      const fog = Math.max(0.12, 1 - z / 46);
+      for (let i = 0; i < W; i++) {
+        const wx = ((i - W / 2) / W) * z * 4.2;
+        const h = height(wx + 64, cam + z);
+        const yScreen = Math.floor(horizon + (EYE - h) * invz);
+        const top = Math.max(0, yScreen);
+        /* Shade by altitude as well as distance. Distance alone gives every
+           slice one tone, so ridges and valleys come out the same and the
+           whole thing reads as a wall with a gradient on it. */
+        const lit = fog * (0.3 + Math.min(1, h / 3.1) * 0.75);
+        for (let y = top; y < ybuf[i]; y++) grid[y * W + i] = shade(lit);
+        if (top < ybuf[i]) ybuf[i] = top;
+      }
+    }
+    let s = '';
+    for (let j = 0; j < H; j++) { s += grid.slice(j * W, j * W + W).join(''); s += '\n'; }
+    return s;
+  };
+}
+
+/* ---- water: the actual 2D wave equation, not a sine dressed up as one.
+   Each cell is pulled by its neighbours against where it was last step, so
+   the ripples interfere and bounce off the walls on their own. ---- */
+function waterDemo(W, H) {
+  const N = W * H;
+  let cur = new Float32Array(N), prev = new Float32Array(N);
+  let acc = 0, nextDrop = 0;
+  const drop = () => {
+    const x = 2 + ((Math.random() * (W - 4)) | 0);
+    const y = 2 + ((Math.random() * (H - 4)) | 0);
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) cur[(y + dy) * W + (x + dx)] = 1.6;
+    }
+    /* rarely: drops on top of each other never resolve into rings, they
+       just keep the surface at a permanent chop */
+    nextDrop = 26 + Math.random() * 44;
+  };
+  drop();
+  const step = () => {
+    if (--nextDrop <= 0) drop();
+    for (let y = 1; y < H - 1; y++) {
+      for (let x = 1; x < W - 1; x++) {
+        const i = y * W + x;
+        const v = (cur[i - 1] + cur[i + 1] + cur[i - W] + cur[i + W]) / 2 - prev[i];
+        prev[i] = v * 0.972;             // a little loss, or it never settles
+      }
+    }
+    const tmp = cur; cur = prev; prev = tmp;
+  };
+  return (t, dt) => {
+    acc += dt;
+    let guard = 4;
+    while (acc > 32 && guard--) { step(); acc -= 32; }
+    let s = '';
+    for (let j = 0; j < H; j++) {
+      for (let i = 0; i < W; i++) s += shade(Math.abs(cur[j * W + i]) * 1.5);
+      s += '\n';
+    }
+    return s;
+  };
+}
+
+/* ---- copper bars. The Amiga's copper could change colour mid-scanline, so
+   every demo opened with these. In one phosphor they're brightness. ---- */
+function rasterbarsDemo(W, H) {
+  const BARS = 5;
+  return (t) => {
+    let s = '';
+    for (let j = 0; j < H; j++) {
+      let v = 0;
+      for (let k = 0; k < BARS; k++) {
+        const c = H / 2 - 0.5 + Math.sin(t * (0.85 + k * 0.19) + k * 1.25) * (H / 2 - 0.5);
+        const d = Math.abs(j - c);
+        const w = 2.4;
+        if (d < w) v = Math.max(v, (1 - d / w) ** 0.65);
+      }
+      s += shade(v).repeat(W) + '\n';
+    }
+    return s;
+  };
+}
+
+/* ---- Gray-Scott: two chemicals, one feeding on the other. Nothing else
+   here is alive in this particular way — it grows, splits, and heals. ---- */
+function grayScottDemo(W, H) {
+  const N = W * H;
+  const A = new Float32Array(N).fill(1), B = new Float32Array(N);
+  const A2 = new Float32Array(N), B2 = new Float32Array(N);
+  const F = 0.0545, K = 0.062, DA = 1.0, DB = 0.5;
+  for (let s = 0; s < 14; s++) {
+    const cx = (Math.random() * W) | 0, cy = (Math.random() * H) | 0;
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -3; dx <= 3; dx++) B[(((cy + dy) + H) % H) * W + (((cx + dx) + W) % W)] = 1;
+    }
+  }
+  /* The weighted 9-point Laplacian, not a bare 5-point one with -4 in the
+     middle. Explicit diffusion is only stable while dt*D/dx^2 <= 0.25; at
+     dt=1, D=1, dx=1 the 5-point form sits at 1.0, four times over, and the
+     whole field diverges to NaN on the first step and renders as nothing. */
+  const step = () => {
+    for (let y = 0; y < H; y++) {
+      const u = ((y - 1 + H) % H) * W, m = y * W, d = ((y + 1) % H) * W;
+      for (let x = 0; x < W; x++) {
+        const i = m + x, l = (x - 1 + W) % W, r = (x + 1) % W;
+        const lapA = 0.2 * (A[u + x] + A[d + x] + A[m + l] + A[m + r])
+                   + 0.05 * (A[u + l] + A[u + r] + A[d + l] + A[d + r]) - A[i];
+        const lapB = 0.2 * (B[u + x] + B[d + x] + B[m + l] + B[m + r])
+                   + 0.05 * (B[u + l] + B[u + r] + B[d + l] + B[d + r]) - B[i];
+        const abb = A[i] * B[i] * B[i];
+        A2[i] = A[i] + (DA * lapA - abb + F * (1 - A[i]));
+        B2[i] = B[i] + (DB * lapB + abb - (K + F) * B[i]);
+      }
+    }
+    A.set(A2); B.set(B2);
+  };
+  return () => {
+    for (let i = 0; i < 8; i++) step();
+    let s = '';
+    for (let j = 0; j < H; j++) {
+      for (let i = 0; i < W; i++) s += shade(B[j * W + i] * 2.6);
+      s += '\n';
+    }
+    return s;
+  };
+}
+
 const DEMOS = [
   /* --- fields --- */
   { name: 'plasma', make: field((x, y, t) => (
@@ -1248,6 +1413,10 @@ const DEMOS = [
   { name: 'scroller',   make: scrollerDemo },
   { name: 'twister',    make: twisterDemo },
   { name: 'kefrens',    make: kefrensDemo },
+  { name: 'voxel',      make: voxelDemo },
+  { name: 'water',      make: waterDemo },
+  { name: 'copper bars', make: rasterbarsDemo },
+  { name: 'gray-scott', make: grayScottDemo },
   { name: 'life',       make: lifeDemo },
   { name: 'rule 30',    make: caDemo(30, false) },
   { name: 'rule 110',   make: caDemo(110, true) },
