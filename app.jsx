@@ -4,19 +4,28 @@ const { useState, useEffect, useRef, useMemo, useCallback } = React;
    TZM-OS — CRT terminal landing page
    ========================================================= */
 
+/* Every social is a symlink out of /home/tzm — which is what they
+   literally are. `kb` is the weight of me on the other end. */
 const SOCIALS = [
-  { glyph: '@', name: 'upwork',     handle: '~freelancer',    url: 'https://www.upwork.com/freelancers/~013c497232fa2ab3ad',   kb: '256'  },
-  { glyph: '✦', name: 'portfolio',  handle: 'tzm.ink',        url: 'https://tzm.ink/',                                         kb: '4.2K' },
-  { glyph: '#', name: 'github',     handle: '@thezakman',     url: 'https://github.com/thezakman',                             kb: '92K'  },
-  { glyph: 'S', name: 'substack',   handle: '@thezakman',     url: 'https://thezakman.substack.com/',                          kb: '1.7K' },
-  { glyph: '○', name: 'instagram',  handle: '@thezakman',     url: 'https://www.instagram.com/thezakman',                      kb: '3.1K' },
-  { glyph: 'X', name: 'twitter',    handle: '@thezakman',     url: 'https://twitter.com/thezakman',                            kb: '8.0K' },
-  { glyph: '♫', name: 'soundcloud', handle: '/thezakman',     url: 'https://soundcloud.com/thezakman',                         kb: '12M'  },
-  { glyph: 'R', name: 'reddit',     handle: 'u/thezakman87',  url: 'https://www.reddit.com/user/thezakman87/',                 kb: '666'  },
-  { glyph: '▶', name: 'steam',      handle: 'thezakman87',    url: 'http://steamcommunity.com/id/thezakman87',                 kb: '888K' },
+  { glyph: '@', name: 'upwork',     handle: '~freelancer',    url: 'https://www.upwork.com/freelancers/~013c497232fa2ab3ad',   kb: '256',  mtime: 'Nov 12  2021' },
+  { glyph: '✦', name: 'portfolio',  handle: 'tzm.ink',        url: 'https://tzm.ink/',                                         kb: '4.2K', mtime: 'Feb 28  2024' },
+  { glyph: '#', name: 'github',     handle: '@thezakman',     url: 'https://github.com/thezakman',                             kb: '92K',  mtime: 'Jul 14 23:41' },
+  { glyph: 'S', name: 'substack',   handle: '@thezakman',     url: 'https://thezakman.substack.com/',                          kb: '1.7K', mtime: 'Jan 09  2025' },
+  { glyph: '○', name: 'instagram',  handle: '@thezakman',     url: 'https://www.instagram.com/thezakman',                      kb: '3.1K', mtime: 'Jun 30 18:02' },
+  { glyph: 'X', name: 'twitter',    handle: '@thezakman',     url: 'https://twitter.com/thezakman',                            kb: '8.0K', mtime: 'Mar 02  2023' },
+  { glyph: '♫', name: 'soundcloud', handle: '/thezakman',     url: 'https://soundcloud.com/thezakman',                         kb: '12M',  mtime: 'Aug 17  2016' },
+  { glyph: 'R', name: 'reddit',     handle: 'u/thezakman87',  url: 'https://www.reddit.com/user/thezakman87/',                 kb: '666',  mtime: 'Oct 31  2019' },
+  { glyph: '▶', name: 'steam',      handle: 'thezakman87',    url: 'http://steamcommunity.com/id/thezakman87',                 kb: '888K', mtime: 'Dec 24  2022' },
 ];
 
 const CMDS = ['about', 'social', 'donate', 'contact', 'neofetch', 'matrix', 'cats', 'date', 'clear'];
+
+/* Everything tab-completable, including what the button bar doesn't show. */
+const COMPLETIONS = [
+  'about', 'beer', 'cats', 'clear', 'contact', 'date', 'degauss', 'donate',
+  'exit', 'hardware', 'help', 'irc', 'ls', 'ls -la', 'matrix', 'neofetch',
+  'poweroff', 'shutdown', 'social', 'specs', 'whoami',
+];
 
 /* ==================== helpers ==================== */
 
@@ -24,12 +33,6 @@ function nowStr() {
   const d = new Date();
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
-}
-
-function dateStr() {
-  const d = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 function uptimeSince(start) {
@@ -49,11 +52,22 @@ function withA(hex, a) {
    like and the character stays razor sharp. A blur filter over the top of
    the text would veil it instead — bloom lights the area around a source,
    it never fogs the source. */
-function phosphorShadow(glow, bloom, color) {
-  const layers = [
-    `0 0 ${(1.5 * glow).toFixed(1)}px ${withA(color, 0.9)}`,
-    `0 0 ${(4 * glow).toFixed(1)}px ${withA(color, 0.5)}`,
-  ];
+function phosphorShadow(glow, bloom, converge, color) {
+  const layers = [];
+
+  /* Misconvergence: the three guns never land on exactly the same spot, so
+     each stroke carries a red edge on one side and a blue one on the other.
+     Done as zero-blur shadows, which sit behind the glyph — displacing the
+     real channels would mean running the text through a filter, and that
+     resamples it. Earliest shadow paints on top, so fringes go first. */
+  if (converge > 0) {
+    layers.push(`${(-converge).toFixed(2)}px 0 0 rgba(255, 42, 42, 0.4)`);
+    layers.push(`${converge.toFixed(2)}px 0 0 rgba(60, 90, 255, 0.34)`);
+  }
+
+  layers.push(`0 0 ${(1.5 * glow).toFixed(1)}px ${withA(color, 0.9)}`);
+  layers.push(`0 0 ${(4 * glow).toFixed(1)}px ${withA(color, 0.5)}`);
+
   if (bloom > 0) {
     layers.push(`0 0 ${(12 * glow).toFixed(1)}px ${withA(color, 0.34 * bloom)}`);
     layers.push(`0 0 ${(26 * glow).toFixed(1)}px ${withA(color, 0.2 * bloom)}`);
@@ -98,20 +112,6 @@ function PhosphorImage({ src, alt, className }) {
       aria-label={alt}
     >
       <img src={src} alt={alt} style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0 }} />
-    </div>
-  );
-}
-
-function Prompt({ cmd }) {
-  return (
-    <div className="section-hd">
-      <span className="ps1-user">tzm</span>
-      <span className="ps1-at">@</span>
-      <span className="ps1-host">cyberspace</span>
-      <span className="ps1-colon">:</span>
-      <span className="ps1-path">~</span>
-      <span className="ps1-dollar">$</span>
-      <span className="ps1-cmd"> {cmd}</span>
     </div>
   );
 }
@@ -164,6 +164,43 @@ function SocialRow({ s }) {
       <span className="name">{s.name}</span>
       <span className="handle">{s.handle}</span>
     </a>
+  );
+}
+
+function LsRow({ s }) {
+  return (
+    <a className="lsrow" href={s.url} target="_blank" rel="noopener noreferrer">
+      <span className="perm">lrwxrwxrwx</span>
+      <span className="dim">1</span>
+      <span className="dim">tzm</span>
+      <span className="dim">tzm</span>
+      <span className="size">{s.kb}</span>
+      <span className="mtime">{s.mtime}</span>
+      <span className="name">{s.name}</span>
+      <span className="arrow">{'->'}</span>
+      <span className="target">{s.url}</span>
+    </a>
+  );
+}
+
+function LsBlock() {
+  return (
+    <div className="out ls">
+      <div className="dim">total 108</div>
+      <div className="lsrow static">
+        <span className="perm">drwxr-xr-x</span>
+        <span className="dim">2</span><span className="dim">tzm</span><span className="dim">tzm</span>
+        <span className="size">4.0K</span><span className="mtime">Jul 15 04:55</span>
+        <span className="name">.</span><span /><span />
+      </div>
+      <div className="lsrow static">
+        <span className="perm">drwxr-xr-x</span>
+        <span className="dim">18</span><span className="dim">root</span><span className="dim">root</span>
+        <span className="size">4.0K</span><span className="mtime">Jan  1  1987</span>
+        <span className="name">..</span><span /><span />
+      </div>
+      {SOCIALS.map((s) => <LsRow key={s.name} s={s} />)}
+    </div>
   );
 }
 
@@ -255,6 +292,8 @@ function App() {
     "glow": 0.7,
     "bloom": 0.5,
     "emission": 0.8,
+    "converge": 0.5,
+    "burnin": 0.55,
     "grime": true,
     "flicker": true,
     "jitter": true,
@@ -269,6 +308,56 @@ function App() {
   const [bootDone, setBootDone] = useState(0);
   const totalBoot = 8;
   const wasSkipped = useRef(false);
+
+  /* ---- the monitor itself, independent of the machine driving it ----
+     Powering the tube off doesn't reboot tzm-sh, so the scrollback is
+     still there when it comes back — same as unplugging a real display. */
+  const [power, setPower] = useState('on');   // 'on' | 'off'
+  const [collapsing, setCollapsing] = useState(false);
+  const [degaussing, setDegaussing] = useState(false);
+  const [wiping, setWiping] = useState(false);
+  const timers = useRef([]);
+
+  const after = useCallback((ms, fn) => {
+    const id = setTimeout(fn, ms);
+    timers.current.push(id);
+    return id;
+  }, []);
+
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+
+  const degauss = useCallback(() => {
+    setDegaussing(true);
+    after(1100, () => setDegaussing(false));
+  }, [after]);
+
+  const powerOff = useCallback(() => {
+    setCollapsing(true);
+    after(620, () => { setPower('off'); setCollapsing(false); });
+  }, [after]);
+
+  const powerOn = useCallback(() => {
+    setPower('on');
+    degauss();
+    after(60, () => { if (inputRef.current) inputRef.current.focus(); });
+  }, [after, degauss]);
+
+  /* the tube degausses when it warms up, like every CRT ever made */
+  useEffect(() => { degauss(); }, []);
+
+  /* any input wakes a sleeping monitor */
+  useEffect(() => {
+    if (power !== 'off') return;
+    const wake = () => powerOn();
+    window.addEventListener('click', wake);
+    window.addEventListener('keydown', wake);
+    window.addEventListener('touchstart', wake);
+    return () => {
+      window.removeEventListener('click', wake);
+      window.removeEventListener('keydown', wake);
+      window.removeEventListener('touchstart', wake);
+    };
+  }, [power, powerOn]);
 
   const skipBoot = useCallback(() => {
     wasSkipped.current = true;
@@ -358,7 +447,9 @@ function App() {
     '--phosphor-hue': ph.hue,
     '--scanline-a': v.scanlines,
     '--emission': v.emission,
-    '--text-shadow': phosphorShadow(v.glow, v.bloom, ph.glow),
+    '--burnin': v.burnin,
+    '--converge': `${v.converge}px`,
+    '--text-shadow': phosphorShadow(v.glow, v.bloom, v.converge, ph.glow),
     '--font-body': v.font === 'vt323' ? "'VT323', 'IBM Plex Mono', monospace" : "'JetBrains Mono', 'IBM Plex Mono', monospace",
     '--font-size': v.font === 'vt323' ? '20px' : '15px',
   };
@@ -383,8 +474,10 @@ function App() {
       out = { kind: 'help' };
     } else if (c === 'about' || c === 'whoami' || c === 'cat about.txt') {
       out = { kind: 'about' };
-    } else if (c === 'ls' || c === 'social' || c === 'ls -la' || c === 'ls -la /social') {
+    } else if (c === 'social' || c === 'ls' || c === 'll') {
       out = { kind: 'social' };
+    } else if (c === 'ls -la' || c === 'ls -l' || c === 'ls -al' || c === 'ls -la /social') {
+      out = { kind: 'ls' };
     } else if (c === 'donate' || c === 'beer' || c === 'donate --beer') {
       out = { kind: 'donate' };
     } else if (c === 'contact' || c === 'irc') {
@@ -398,11 +491,21 @@ function App() {
     } else if (c === 'date') {
       out = { kind: 'text', text: nowStr() };
     } else if (c === 'clear' || c === 'cls') {
-      setHistory([]);
-      setTimeout(() => { if (inputRef.current) inputRef.current.focus(); }, 100);
+      /* phosphor doesn't cut to black — let the old frame decay out */
+      setWiping(true);
+      after(220, () => {
+        setHistory([]);
+        setWiping(false);
+        if (inputRef.current) inputRef.current.focus();
+      });
       return;
-    } else if (c === 'exit' || c === 'logout' || c === 'quit') {
-      out = { kind: 'text', text: "you can't leave the internet. you've been here since 1987." };
+    } else if (c === 'degauss') {
+      degauss();
+      out = { kind: 'text', text: 'degaussing coil energized ... field collapsed.' };
+    } else if (c === 'exit' || c === 'logout' || c === 'quit' || c === 'poweroff' || c === 'shutdown') {
+      setHistory(h => [...h, echo, { kind: 'text', text: 'signal lost. (the shell is still running — wake it with any key)' }]);
+      after(420, powerOff);
+      return;
     } else if (c.startsWith('sudo')) {
       out = { kind: 'text', text: `[sudo] password for ${c.slice(5) || 'guest'}: incorrect. try 'help'.`, warn: true };
     } else if (c === 'rm -rf /' || c === 'rm -rf') {
@@ -412,12 +515,26 @@ function App() {
     }
     setHistory(h => [...h, echo, out]);
     setTimeout(() => { if (inputRef.current) inputRef.current.focus(); }, 100);
-  }, []);
+  }, [after, degauss, powerOff]);
 
   const handleKey = (e) => {
     if (e.key === 'Enter') {
       runCommand(input);
       setInput('');
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      const cur = input.trim().toLowerCase();
+      if (!cur) return;
+      const hits = COMPLETIONS.filter(c => c.startsWith(cur));
+      if (hits.length === 0) return;
+      if (hits.length === 1) { setInput(hits[0]); return; }
+      /* ambiguous: fill in as far as they agree, then list the rest */
+      let prefix = hits[0];
+      for (const h of hits) {
+        while (!h.startsWith(prefix)) prefix = prefix.slice(0, -1);
+      }
+      setInput(prefix);
+      setHistory(h => [...h, { kind: 'echo', cmd: input }, { kind: 'hits', hits }]);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       const hist = cmdHistory.current;
@@ -442,12 +559,29 @@ function App() {
   /* ==================== render ==================== */
 
   return (
-    <div className={`crt ph-${v.phosphor} font-${v.font} ${v.curvature ? 'curved' : ''} ${v.flicker ? 'flicker' : ''} ${v.jitter ? 'jitter' : ''}`} style={cssVars}>
+    <div
+      className={[
+        'crt', `ph-${v.phosphor}`, `font-${v.font}`,
+        v.curvature && 'curved',
+        v.flicker && 'flicker',
+        v.jitter && 'jitter',
+        power === 'off' && 'powered-off',
+        collapsing && 'collapsing',
+        degaussing && 'degaussing',
+      ].filter(Boolean).join(' ')}
+      style={cssVars}
+    >
       <div className="bezel">
         <div className="screen">
           <div className="scanlines"></div>
           <div className="vignette"></div>
           <div className="rgb"></div>
+
+          {/* 39 years of the same status bar and prompt etched into the phosphor */}
+          <div className="burnin"></div>
+
+          {/* convergence drifts the further the beam has to travel */}
+          <div className="converge-edge"></div>
 
           {/* the glass itself: 30 years of dust, fingerprints and dead subpixels */}
           {v.grime && (
@@ -457,6 +591,12 @@ function App() {
               <div className="deadpix"></div>
             </>
           )}
+
+          {/* the dot the raster collapses into when the tube cuts out */}
+          <div className="dot"></div>
+          <div className="degauss-fx"></div>
+
+          <div className={`raster ${wiping ? 'wiping' : ''}`}>
 
           <StatusBar bootStart={bootStart} phosphor={v.phosphor} />
 
@@ -502,6 +642,12 @@ function App() {
                   if (h.kind === 'social') return (
                     <div key={i} className="out">
                       {SOCIALS.map((s) => <SocialRow key={s.name} s={s} />)}
+                    </div>
+                  );
+                  if (h.kind === 'ls') return <LsBlock key={i} />;
+                  if (h.kind === 'hits') return (
+                    <div key={i} className="out hits">
+                      {h.hits.map(x => <span key={x}>{x}</span>)}
                     </div>
                   );
                   if (h.kind === 'donate') return (
@@ -569,11 +715,28 @@ function App() {
               </div>
             </div>
           )}
+
+          </div>{/* /.raster */}
         </div>
 
         <div className="bezel-tag">
-          <span className="led on"></span>
+          <span className={`led ${power === 'on' ? 'on' : 'standby'}`}></span>
           <span className="copyleft">since 1987 / (c) TheZakMan</span>
+          <span className="hw-controls">
+            <button
+              className="hw-btn"
+              onClick={degauss}
+              disabled={power === 'off'}
+              title="Degauss"
+              aria-label="Degauss the tube"
+            >degauss</button>
+            <button
+              className="hw-btn power"
+              onClick={() => (power === 'on' ? powerOff() : powerOn())}
+              title={power === 'on' ? 'Power off' : 'Power on'}
+              aria-label={power === 'on' ? 'Power the monitor off' : 'Power the monitor on'}
+            >{'⏻'}</button>
+          </span>
         </div>
       </div>
 
@@ -598,6 +761,8 @@ function App() {
               <TweakSlider label="Glow" value={v.glow} min={0} max={1.5} step={0.05} onChange={(x) => setTweak('glow', x)} />
               <TweakSlider label="Bloom" value={v.bloom} min={0} max={1} step={0.05} onChange={(x) => setTweak('bloom', x)} />
               <TweakSlider label="Emission" value={v.emission} min={0} max={2} step={0.05} onChange={(x) => setTweak('emission', x)} />
+              <TweakSlider label="Misconvergence" value={v.converge} min={0} max={2} step={0.1} onChange={(x) => setTweak('converge', x)} />
+              <TweakSlider label="Burn-in" value={v.burnin} min={0} max={1.5} step={0.05} onChange={(x) => setTweak('burnin', x)} />
             </TweakSection>
             <TweakSection title="CRT">
               <TweakSlider label="Scanlines" value={v.scanlines} min={0} max={0.8} step={0.02} onChange={(x) => setTweak('scanlines', x)} />
