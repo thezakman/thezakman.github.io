@@ -1708,10 +1708,18 @@ function App() {
           {/* convergence drifts the further the beam has to travel */}
           <div className="converge-edge"></div>
 
-          {/* the room, hanging on the front of the glass. It parallaxes
+          {/* The room, hanging on the front of the glass. It parallaxes
               against the picture, which is what makes the glass read as a
               surface in front rather than a texture on top. */}
           {v.reflection > 0 && <div className="reflection"></div>}
+
+          {/* The rim is a separate layer on purpose: it comes from the
+              curvature, which belongs to the tube, not to where you're
+              standing — so it must not slide with the viewer. It also can't
+              live on the parallax layer, which is inset past the glass edge
+              to give the room room to move; the rim's brightest stop would
+              land outside the screen and get clipped away. */}
+          {v.reflection > 0 && <div className="rim"></div>}
 
           {/* the glass itself: 30 years of dust, fingerprints and dead subpixels */}
           {v.grime && (
