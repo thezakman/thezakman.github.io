@@ -38,6 +38,29 @@ function uptimeSince(start) {
   return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
 }
 
+/* '#3fffa1' + 0.35 -> '#3fffa159' */
+function withA(hex, a) {
+  const n = Math.round(Math.max(0, Math.min(1, a)) * 255);
+  return hex + n.toString(16).padStart(2, '0');
+}
+
+/* Phosphor bloom, built from stacked text-shadows.
+   text-shadow paints *behind* the glyph, so the halo can be as wide as we
+   like and the character stays razor sharp. A blur filter over the top of
+   the text would veil it instead — bloom lights the area around a source,
+   it never fogs the source. */
+function phosphorShadow(glow, bloom, color) {
+  const layers = [
+    `0 0 ${(1.5 * glow).toFixed(1)}px ${withA(color, 0.9)}`,
+    `0 0 ${(4 * glow).toFixed(1)}px ${withA(color, 0.5)}`,
+  ];
+  if (bloom > 0) {
+    layers.push(`0 0 ${(12 * glow).toFixed(1)}px ${withA(color, 0.34 * bloom)}`);
+    layers.push(`0 0 ${(26 * glow).toFixed(1)}px ${withA(color, 0.2 * bloom)}`);
+  }
+  return layers.join(', ');
+}
+
 function rndHex(len = 8) {
   const c = '0123456789ABCDEF';
   let s = '';
@@ -230,6 +253,9 @@ function App() {
     "scanlines": 0.35,
     "curvature": true,
     "glow": 0.7,
+    "bloom": 0.5,
+    "emission": 0.8,
+    "grime": true,
     "flicker": true,
     "jitter": true,
     "font": "vt323"
@@ -331,7 +357,8 @@ function App() {
     '--glow': ph.glow,
     '--phosphor-hue': ph.hue,
     '--scanline-a': v.scanlines,
-    '--text-shadow': `0 0 ${4 * v.glow}px ${ph.glow}, 0 0 ${10 * v.glow}px ${ph.glow}88`,
+    '--emission': v.emission,
+    '--text-shadow': phosphorShadow(v.glow, v.bloom, ph.glow),
     '--font-body': v.font === 'vt323' ? "'VT323', 'IBM Plex Mono', monospace" : "'JetBrains Mono', 'IBM Plex Mono', monospace",
     '--font-size': v.font === 'vt323' ? '20px' : '15px',
   };
@@ -421,6 +448,15 @@ function App() {
           <div className="scanlines"></div>
           <div className="vignette"></div>
           <div className="rgb"></div>
+
+          {/* the glass itself: 30 years of dust, fingerprints and dead subpixels */}
+          {v.grime && (
+            <>
+              <div className="dust"></div>
+              <div className="smudge"></div>
+              <div className="deadpix"></div>
+            </>
+          )}
 
           <StatusBar bootStart={bootStart} phosphor={v.phosphor} />
 
@@ -560,12 +596,15 @@ function App() {
                 ]}
               />
               <TweakSlider label="Glow" value={v.glow} min={0} max={1.5} step={0.05} onChange={(x) => setTweak('glow', x)} />
+              <TweakSlider label="Bloom" value={v.bloom} min={0} max={1} step={0.05} onChange={(x) => setTweak('bloom', x)} />
+              <TweakSlider label="Emission" value={v.emission} min={0} max={2} step={0.05} onChange={(x) => setTweak('emission', x)} />
             </TweakSection>
             <TweakSection title="CRT">
               <TweakSlider label="Scanlines" value={v.scanlines} min={0} max={0.8} step={0.02} onChange={(x) => setTweak('scanlines', x)} />
               <TweakToggle label="Curvature" value={v.curvature} onChange={(x) => setTweak('curvature', x)} />
               <TweakToggle label="Flicker" value={v.flicker} onChange={(x) => setTweak('flicker', x)} />
               <TweakToggle label="Jitter" value={v.jitter} onChange={(x) => setTweak('jitter', x)} />
+              <TweakToggle label="Dust & wear" value={v.grime} onChange={(x) => setTweak('grime', x)} />
             </TweakSection>
             <TweakSection title="Typography">
               <TweakRadio
