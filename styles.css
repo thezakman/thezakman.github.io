@@ -89,6 +89,8 @@ body {
   z-index: 1;
 }
 
+/* Absolutely positioned, so if it ever wraps it grows up into the screen
+   instead of pushing the bezel — it has to stay one line at every width. */
 .bezel-tag {
   position: absolute;
   bottom: 18px;
@@ -96,6 +98,9 @@ body {
   transform: translateX(-50%);
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  max-width: 100%;
   gap: 16px;
   color: #5a5048;
   font-family: 'JetBrains Mono', monospace;
@@ -138,20 +143,17 @@ body {
 .screen-bottom {
   position: relative;
   z-index: 10;
-  padding: 6px 16px 8px;
+  padding: 0;
   border-top: 1px solid color-mix(in oklab, var(--fg) 15%, transparent);
   background: var(--bg);
   text-shadow: var(--text-shadow);
   flex-shrink: 0;
 }
-.screen-bottom .cmd-bar {
-  padding: 2px 0 4px;
-  border-top: none;
-}
+/* the command line is inset; the f-key strip below it is not */
 .screen-bottom .line.live {
   display: flex;
   align-items: center;
-  padding: 2px 0;
+  padding: 5px 16px 6px;
 }
 .screen-bottom .cmd-input {
   padding: 0 0 0 4px;
@@ -385,7 +387,7 @@ body {
        the glyphs, so this repeats on the line rhythm instead of being a
        solid block, which would just read as a stray rectangle */
     repeating-linear-gradient(180deg,
-      color-mix(in oklab, var(--fg) 4.5%, transparent) 0 9px,
+      color-mix(in oklab, var(--fg) 2.8%, transparent) 0 9px,
       transparent 9px 27px),
     /* the clock, burned into the top right */
     linear-gradient(90deg, color-mix(in oklab, var(--fg) 5%, transparent) 0 100%);
@@ -768,22 +770,23 @@ body {
 
 /* ====================== SOCIAL ROWS ====================== */
 
+/* Sits directly under `ls -la` in the scrollback, so it has to keep the
+   same line rhythm — 40px rows read as a web nav menu that wandered into
+   a terminal. Mobile gets the touch target back below. */
 .socrow {
   display: grid;
-  grid-template-columns: 36px auto 1fr;
+  grid-template-columns: 30px auto 1fr;
   gap: 0 10px;
-  align-items: center;
-  padding: 6px 8px;
-  margin: 0 -8px;
+  align-items: baseline;
+  padding: 1px 6px;
+  margin: 0 -6px;
   color: var(--fg);
   text-decoration: none;
-  border-radius: 2px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 14px;
-  letter-spacing: 0.02em;
+  font-size: 12.5px;
+  line-height: 1.5;
   transition: background 80ms linear;
   position: relative;
-  min-height: 40px;
 }
 .socrow:hover,
 .socrow:active {
@@ -889,41 +892,95 @@ body {
   text-shadow: 0 0 4px var(--glow);
 }
 
-/* ====================== COMMAND BAR ====================== */
+/* ====================== FUNCTION KEY STRIP ======================
+   Norton Commander / mc: the last line of the screen, edge to edge, digit
+   then inverse-video label. It's the native idiom for a terminal's bottom
+   bar, and it fills a 21:9 tube that free-floating buttons left empty. */
 
-.cmd-bar {
+.fkeys {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  padding: 14px 0;
-  border-top: 1px dashed color-mix(in oklab, var(--fg) 20%, transparent);
-}
-.cmd-bar .dim { margin-left: 4px; }
-
-.kbd {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 12px;
-  margin: 2px 0;
-  border: 1px solid color-mix(in oklab, var(--fg) 50%, transparent);
-  border-radius: 3px;
-  background: color-mix(in oklab, var(--fg) 8%, transparent);
+  width: 100%;
+  gap: 1px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  cursor: pointer;
+  font-size: 11px;
   user-select: none;
-  text-transform: lowercase;
-  min-height: 34px;
-  transition: background 80ms, transform 80ms;
 }
-.kbd:hover {
-  background: color-mix(in oklab, var(--fg) 22%, transparent);
+
+.fkey {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  color: var(--fg);
 }
-.kbd:active {
-  background: color-mix(in oklab, var(--fg) 30%, transparent);
-  transform: scale(0.96);
+
+.fk-n {
+  padding: 3px 4px 3px 2px;
+  opacity: 0.7;
+  text-shadow: var(--text-shadow);
+  flex-shrink: 0;
+}
+
+/* inverse video: the phosphor is the background, the label is the hole */
+.fk-label {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  background: color-mix(in oklab, var(--fg) 82%, var(--bg));
+  color: var(--bg);
+  text-shadow: none;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background 80ms linear;
+}
+.fkey:hover .fk-label { background: color-mix(in oklab, var(--fg) 100%, white 20%); }
+.fkey:active .fk-label { background: color-mix(in oklab, var(--fg) 60%, var(--bg)); }
+.fkey:focus-visible { outline: 1px solid var(--fg); outline-offset: -1px; }
+
+/* ====================== HELP ====================== */
+
+/* wide enough that no description wraps — a ragged second line breaks the
+   line rhythm the whole terminal is built on */
+.help {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 0 28px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+}
+.help-row {
+  display: grid;
+  grid-template-columns: 8.5em 1fr;
+  gap: 0 10px;
+  align-items: baseline;
+  white-space: nowrap;
+  padding: 2px 6px;
+  margin: 0 -6px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+  text-shadow: var(--text-shadow);
+}
+.help-row:hover, .help-row:focus-visible {
+  background: color-mix(in oklab, var(--fg) 14%, transparent);
+  outline: none;
+}
+.help-cmd { font-weight: 700; color: color-mix(in oklab, var(--fg) 55%, white 45%); }
+.help-what { opacity: 0.62; }
+.help-foot {
+  grid-column: 1 / -1;
+  padding-top: 8px;
+  font-size: 11px;
 }
 
 /* ====================== BEER & DONATE ====================== */
@@ -962,16 +1019,43 @@ body {
 
 .neofetch {
   display: grid;
-  grid-template-columns: 120px 1fr;
-  gap: 16px;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 28px;
   align-items: center;
+  max-width: 660px;
 }
 .specs {
   font-family: 'JetBrains Mono', monospace;
   font-size: 13px;
+}
+.specs-hd { font-weight: 700; letter-spacing: 0.02em; }
+.specs-rule {
+  height: 1px;
+  margin: 5px 0 7px;
+  background: color-mix(in oklab, var(--fg) 30%, transparent);
+}
+
+/* dt/dd rather than padded strings: the old block aligned its columns with
+   trailing spaces inside the labels, which only held while every label was
+   under ten characters */
+.specs-list {
+  display: grid;
+  grid-template-columns: 5.6em minmax(0, 1fr);
+  gap: 1px 12px;
+  margin: 0;
+}
+.specs-list dt { opacity: 0.48; }
+.specs-list dd { margin: 0; }
+
+.ramp {
   display: flex;
-  flex-direction: column;
   gap: 2px;
+  margin-top: 12px;
+}
+.ramp span {
+  width: 20px;
+  height: 9px;
+  box-shadow: 0 0 5px color-mix(in oklab, var(--glow) 30%, transparent);
 }
 
 /* ====================== MATRIX & CATS ====================== */
@@ -1034,7 +1118,9 @@ body {
   .out.grid2 { grid-template-columns: 1fr; }
   .neofetch { grid-template-columns: 80px 1fr; gap: 12px; }
   .phosphor-img.neofetch-logo { height: 80px; }
+  /* the switches earn their room; the credit line gives way */
   .bezel-tag { font-size: 9px; gap: 8px; }
+  .bezel-tag .copyleft { overflow: hidden; text-overflow: ellipsis; }
 }
 
 @media (max-width: 600px) {
@@ -1076,7 +1162,8 @@ body {
   .socrow { font-size: 12px; min-height: 44px; }
   .neofetch { grid-template-columns: 1fr; }
   .phosphor-img.neofetch-logo { display: none; }
-  .kbd { font-size: 11px; padding: 6px 14px; min-height: 38px; }
+  .help { grid-template-columns: 1fr; font-size: 11.5px; }
+  .help-row { grid-template-columns: 7em 1fr; min-height: 30px; }
   .btn { font-size: 12px; padding: 10px 16px; }
   .beer { font-size: 12px; }
   .catart { font-size: 14px; }
@@ -1084,7 +1171,19 @@ body {
   .out.grid2 { gap: 2px 12px; }
   .bezel-tag { font-size: 7px; gap: 6px; bottom: 8px; }
   .bezel-tag .led { width: 6px; height: 6px; }
+  .bezel-tag .copyleft { display: none; }
   .socfoot { font-size: 10px; }
+}
+
+/* Nine labels stop fitting one row at about here — the breakpoint is where
+   the words actually truncate, not where a device category begins. Below
+   it there are no F-keys to press either, so the digit is the half that
+   goes: the label is the only affordance a thumb has. */
+@media (max-width: 760px) {
+  .fkeys { flex-wrap: wrap; gap: 1px; font-size: 11px; }
+  .fkey { flex: 1 0 30%; }
+  .fk-n { display: none; }
+  .fk-label { text-align: center; padding: 9px 4px; }
 }
 
 @media (max-width: 380px) {

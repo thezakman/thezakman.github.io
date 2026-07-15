@@ -20,6 +20,30 @@ const SOCIALS = [
 
 const CMDS = ['about', 'social', 'donate', 'contact', 'neofetch', 'matrix', 'cats', 'date', 'clear'];
 
+/* The function-key strip every DOS-era file manager ended with. The digit
+   is real: F1-F9 fire it, and so does Alt+digit, since macOS eats bare
+   F-keys unless you've turned that off. */
+const FKEYS = CMDS.map((cmd, i) => ({ n: i + 1, cmd }));
+
+/* What `help` prints. Includes the commands the strip has no room for —
+   otherwise degauss, sound and the ls flags are only findable by tabbing
+   blindly. */
+const HELP = [
+  ['about',      'who you are talking to'],
+  ['social',     'where else I exist'],
+  ['ls -la',     'the same, as symlinks'],
+  ['donate',     'buy me a beer'],
+  ['contact',    'how to reach me'],
+  ['neofetch',   'system summary'],
+  ['matrix',     'you already know'],
+  ['cats',       '17527 of them'],
+  ['date',       'utc, always'],
+  ['degauss',    'fire the coil'],
+  ['sound',      'let the flyback sing'],
+  ['clear',      'wipe the phosphor'],
+  ['exit',       'cut the signal'],
+];
+
 /* Everything tab-completable, including what the button bar doesn't show. */
 const COMPLETIONS = [
   'about', 'beer', 'cats', 'clear', 'contact', 'date', 'degauss', 'donate',
@@ -320,18 +344,21 @@ function BootLine({ text, ok = true, delay = 0, onDone }) {
   );
 }
 
-function CmdKbd({ cmd, onRun }) {
+function FKeyBar({ onRun }) {
   return (
-    <span
-      className="kbd"
-      role="button"
-      tabIndex={0}
-      onClick={(e) => { e.preventDefault(); onRun(cmd); }}
-      onTouchEnd={(e) => { e.preventDefault(); onRun(cmd); }}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRun(cmd); } }}
-    >
-      {cmd}
-    </span>
+    <div className="fkeys">
+      {FKEYS.map((f) => (
+        <button
+          key={f.n}
+          className="fkey"
+          onClick={() => onRun(f.cmd)}
+          title={`F${f.n} — ${f.cmd}`}
+        >
+          <span className="fk-n">{f.n}</span>
+          <span className="fk-label">{f.cmd}</span>
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -382,21 +409,48 @@ function LsBlock() {
   );
 }
 
+const SPECS = [
+  ['os',         'tzm-os (cyberspace)'],
+  ['host',       'thezakman.github.io'],
+  ['kernel',     '1.3.37-vt-glow'],
+  ['shell',      'tzm-sh 1.0'],
+  ['resolution', '1024 × 768 (CRT)'],
+  ['de',         'phosphor + scanlines'],
+  ['cpu',        'heart × 1 @ 60bpm'],
+  ['gpu',        'caffeine + cold beer'],
+  ['memory',     '17527 cat photos / ∞'],
+  ['uptime',     'since 1987'],
+];
+
+/* Real neofetch signs off with the terminal's 16 ANSI swatches. A tube
+   with one phosphor has no palette to show — what it has is intensity,
+   so the ramp is the honest translation. */
+const RAMP = [0.12, 0.24, 0.36, 0.5, 0.64, 0.78, 0.9, 1];
+
 function NeofetchBlock() {
   return (
     <div className="out neofetch">
       <PhosphorImage src="tzm.png" alt="tzm" className="neofetch-logo" />
       <div className="specs">
-        <div><span className="dim">os       </span> tzm-os (cyberspace)</div>
-        <div><span className="dim">host     </span> thezakman.github.io</div>
-        <div><span className="dim">kernel   </span> 1.3.37-vt-glow</div>
-        <div><span className="dim">shell    </span> tzm-sh 1.0</div>
-        <div><span className="dim">resolution</span> 1024 {'×'} 768 (CRT)</div>
-        <div><span className="dim">de       </span> phosphor + scanlines</div>
-        <div><span className="dim">cpu      </span> heart {'×'} 1 @ 60bpm</div>
-        <div><span className="dim">gpu      </span> caffeine + cold beer</div>
-        <div><span className="dim">memory   </span> 17527 cat photos / {'∞'}</div>
-        <div><span className="dim">uptime   </span> since 1987</div>
+        <div className="specs-hd">
+          <span className="ps1-user">tzm</span>
+          <span className="ps1-at">@</span>
+          <span className="ps1-host">cyberspace</span>
+        </div>
+        <div className="specs-rule" />
+        <dl className="specs-list">
+          {SPECS.map(([k, val]) => (
+            <React.Fragment key={k}>
+              <dt>{k}</dt>
+              <dd>{val}</dd>
+            </React.Fragment>
+          ))}
+        </dl>
+        <div className="ramp" aria-hidden="true">
+          {RAMP.map((a) => (
+            <span key={a} style={{ background: `color-mix(in oklab, var(--fg) ${a * 100}%, var(--bg))` }} />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -471,7 +525,7 @@ function App() {
     "bloom": 0.5,
     "emission": 0.8,
     "converge": 0.5,
-    "burnin": 0.55,
+    "burnin": 0.45,
     "deadpix": 0.2,
     "grime": true,
     "sound": false,
@@ -538,6 +592,29 @@ function App() {
     if (v.sound) sound.setPowered(power === 'on');
   }, [v.sound, power, sound]);
 
+  /* The strip's digits have to actually do something or they're a lie.
+     F1-F9 is the period-correct binding, but macOS claims bare F-keys for
+     brightness and volume unless you've opted out, so Alt+digit covers
+     everyone. Plain digits stay untouched — you have to be able to type
+     "1987" at the prompt. */
+  useEffect(() => {
+    if (phase !== 'done' || power !== 'on') return;
+    const onKey = (e) => {
+      if (e.metaKey || e.ctrlKey) return;
+      let n = null;
+      const fkey = /^F([1-9])$/.exec(e.key);
+      if (fkey) n = +fkey[1];
+      else if (e.altKey && /^[1-9]$/.test(e.key)) n = +e.key;
+      if (n === null) return;
+      const hit = FKEYS.find(f => f.n === n);
+      if (!hit) return;
+      e.preventDefault();
+      runCommandRef.current(hit.cmd);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [phase, power]);
+
   /* any input wakes a sleeping monitor */
   useEffect(() => {
     if (power !== 'off') return;
@@ -578,6 +655,9 @@ function App() {
   const inputRef = useRef(null);
   const cmdHistory = useRef([]);
   const cmdHistoryIdx = useRef(-1);
+  /* the F-key listener reads through this so it binds once, instead of
+     re-registering on every keystroke as `input` changes */
+  const runCommandRef = useRef(null);
 
   const scrollToBottom = useCallback(() => {
     if (!scrollRef.current) return;
@@ -613,10 +693,11 @@ function App() {
   useEffect(() => {
     const focus = (e) => {
       if (phase !== 'done') return;
+      /* the f-key strip and the bezel switches are real buttons, so the
+         button check already covers them */
       if (e.target.tagName === 'A' || e.target.closest('a') ||
           e.target.tagName === 'BUTTON' || e.target.closest('button') ||
-          e.target.closest('.twk-panel') ||
-          e.target.classList.contains('kbd') || e.target.closest('.kbd')) return;
+          e.target.closest('.twk-panel')) return;
       if (inputRef.current) inputRef.current.focus();
     };
     window.addEventListener('click', focus);
@@ -715,6 +796,8 @@ function App() {
     setHistory(h => [...h, echo, out]);
     setTimeout(() => { if (inputRef.current) inputRef.current.focus(); }, 100);
   }, [after, degauss, powerOff, v.sound, setTweak]);
+
+  runCommandRef.current = runCommand;
 
   const handleKey = (e) => {
     if (e.key === 'Enter') {
@@ -828,8 +911,16 @@ function App() {
                   if (h.kind === 'echo') return <FullPrompt key={i} cmd={h.cmd} />;
                   if (h.kind === 'text') return <div key={i} className={`out ${h.warn ? 'warn' : ''}`}>{h.text}</div>;
                   if (h.kind === 'help') return (
-                    <div key={i} className="out cmd-bar">
-                      {CMDS.map(c => <CmdKbd key={c} cmd={c} onRun={runCommand} />)}
+                    <div key={i} className="out help">
+                      {HELP.map(([cmd, what]) => (
+                        <button key={cmd} className="help-row" onClick={() => runCommand(cmd)}>
+                          <span className="help-cmd">{cmd}</span>
+                          <span className="help-what">{what}</span>
+                        </button>
+                      ))}
+                      <div className="help-foot dim">
+                        tab completes · {'↑'}{'↓'} walks history · F1-F9 (or alt+1-9) run the strip below
+                      </div>
                     </div>
                   );
                   if (h.kind === 'about') return (
@@ -888,12 +979,10 @@ function App() {
             )}
           </div>
 
-          {/* FIXED BOTTOM: cmd-bar + input */}
+          {/* FIXED BOTTOM: command line, then the function-key strip flush
+              to the tube's edge — the order every DOS file manager used */}
           {phase === 'done' && (
             <div className="screen-bottom">
-              <div className="cmd-bar">
-                {CMDS.map(c => <CmdKbd key={c} cmd={c} onRun={runCommand} />)}
-              </div>
               <div className="line live">
                 <span className="ps1"><span className="ps1-user">tzm</span><span className="ps1-at">@</span><span className="ps1-host">cyberspace</span><span className="ps1-colon">:</span><span className="ps1-path">~</span><span className="ps1-dollar">$</span></span>
                 <input
@@ -912,6 +1001,7 @@ function App() {
                 />
                 <span className="cursor">{'█'}</span>
               </div>
+              <FKeyBar onRun={runCommand} />
             </div>
           )}
 
