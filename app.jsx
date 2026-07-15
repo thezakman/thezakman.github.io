@@ -167,6 +167,16 @@ function rndHex(len = 8) {
   return s;
 }
 
+/* The CSS @media rule can't reach an animation driven by requestAnimationFrame,
+   and matrix and demo are by far the most motion-heavy things here — the two
+   that most need to hold still. They render one frame and stop instead of
+   rendering nothing: the effect is still there to look at, it just doesn't
+   move. */
+function prefersReducedMotion() {
+  return typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 /* ==================== the noise a tube makes ====================
    A powered CRT is never silent: the flyback transformer sings at the
    horizontal scan rate (15.734kHz on NTSC — which is the joke, since
@@ -571,10 +581,15 @@ function MatrixRain() {
     };
     layout();
 
-    const ro = new ResizeObserver(layout);
-    ro.observe(canvas);
+    let raf = 0, last = 0, running = true, repaint = null;
+    /* rain that won't stop is exactly what reduced-motion is asking about:
+       run it far enough that the columns have real trails, then freeze */
+    const still = prefersReducedMotion();
 
-    let raf = 0, last = 0, running = true;
+    /* layout() wipes the canvas, so a frozen frame would be resized to blank
+       and never come back — re-run the pre-roll instead */
+    const ro = new ResizeObserver(() => { layout(); if (repaint) repaint(); });
+    ro.observe(canvas);
 
     const draw = (now) => {
       if (!running) return;
@@ -629,8 +644,19 @@ function MatrixRain() {
           c.chars = [];
         }
       }
+      if (still) { running = false; raf = 0; return; }
       raf = requestAnimationFrame(draw);
     };
+
+    if (still) {
+      repaint = () => {
+        let clock = 0;
+        for (let i = 0; i < 120; i++) { running = true; last = clock; draw(clock += 33); }
+        running = false;
+      };
+      repaint();
+      return () => { ro.disconnect(); };
+    }
 
     /* scroll it out of the tube and it stops costing frames */
     const io = new IntersectionObserver(([e]) => {
@@ -1042,6 +1068,12 @@ function DemoFX() {
     const t0 = performance.now();
     let raf = 0, running = false, last = 0;
 
+    /* one frame, then hold. Some effects need a moment to become themselves —
+       an ant on an empty grid or a cold Lorenz is not worth looking at — so
+       wind them forward before the single frame that gets kept. */
+    const still = prefersReducedMotion();
+    if (still && draw) for (let i = 0; i < 90; i++) draw(i / 30, 33);
+
     const frame = (now) => {
       if (!running) return;
       raf = requestAnimationFrame(frame);
@@ -1053,6 +1085,7 @@ function DemoFX() {
       if (dt < 33) return;                 // 30fps is plenty for ASCII
       last = now;
       if (draw) el.textContent = draw((now - t0) / 1000, Math.min(80, dt));
+      if (still) { running = false; cancelAnimationFrame(raf); }
     };
 
     /* scrolled out of the tube, it stops costing frames */

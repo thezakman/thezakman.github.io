@@ -646,14 +646,9 @@ body {
   transition: filter 0.3s ease;
 }
 
-.phosphor-img.logo-main {
-  width: 160px;
-  height: 140px;
-  flex-shrink: 0;
-  animation: logoglitch 8s infinite;
-}
-
-/* logo glitch/flicker like an old CRT signal */
+/* The glitch was written for .logo-main, a class nothing has rendered for
+   some time — so a signal-drop effect sat in the stylesheet never having
+   run once. It belongs on the logo that does exist. */
 @keyframes logoglitch {
   0%, 89%, 91%, 93%, 100% {
     opacity: 1;
@@ -691,8 +686,9 @@ body {
 
 .phosphor-img.neofetch-logo {
   width: 100%;
-  height: 120px;
+  height: 140px;
   flex-shrink: 0;
+  animation: logoglitch 11s infinite;
 }
 
 @supports not (mask-image: url('')) {
@@ -707,22 +703,6 @@ body {
     object-fit: contain;
     filter: brightness(0.8) sepia(1) hue-rotate(var(--phosphor-hue, 90deg)) saturate(3);
   }
-}
-
-/* ====================== SECTIONS ====================== */
-
-.section {
-  padding: 10px 0;
-  border-bottom: 1px solid color-mix(in oklab, var(--fg) 8%, transparent);
-}
-.section:last-of-type { border-bottom: none; }
-
-.section-hd {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  letter-spacing: 0.04em;
-  opacity: 0.5;
-  margin-bottom: 8px;
 }
 
 /* ====================== OUTPUT BLOCKS ====================== */
@@ -765,32 +745,6 @@ body {
   cursor: pointer;
 }
 @keyframes fadein { to { opacity: 0.35; } }
-
-/* ====================== LOGO FRAME ====================== */
-
-.logo-frame {
-  display: flex;
-  gap: 28px;
-  align-items: center;
-  padding: 20px 0;
-  border-bottom: 1px dashed color-mix(in oklab, var(--fg) 25%, transparent);
-  margin-bottom: 8px;
-}
-.logo-tag { display: flex; flex-direction: column; gap: 6px; }
-.tag-big {
-  font-family: 'VT323', monospace;
-  font-size: 64px;
-  line-height: 1;
-  color: var(--fg);
-  letter-spacing: 0.04em;
-}
-.tag-sm {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  opacity: 0.85;
-}
 
 /* ====================== SOCIAL ROWS ====================== */
 
@@ -1156,9 +1110,6 @@ body {
 }
 @keyframes cursorblink { 50% { opacity: 0; } }
 
-.spacer-sm { height: 6px; }
-.spacer-lg { height: 40px; }
-
 /* ====================== RESPONSIVE ====================== */
 
 @media (max-width: 900px) {
@@ -1167,8 +1118,6 @@ body {
   .bezel::after { top: 6px; left: 6px; right: 6px; bottom: 32px; border-radius: 14px; }
   .statusbar { font-size: 9px; gap: 10px; padding: 8px 10px; }
   .terminal { padding: 12px 12px 60px; font-size: 17px; }
-  .tag-big { font-size: 44px; }
-  .phosphor-img.logo-main { width: 110px; height: 96px; }
   .socrow { font-size: 12px; }
   .out.grid2 { grid-template-columns: 1fr; }
   .neofetch { grid-template-columns: 80px 1fr; gap: 12px; }
@@ -1202,15 +1151,6 @@ body {
     padding-bottom: max(40px, env(safe-area-inset-bottom, 0px));
     font-size: 15px;
   }
-  .logo-frame {
-    flex-direction: column;
-    text-align: center;
-    align-items: center;
-    gap: 14px;
-  }
-  .tag-big { font-size: 36px; }
-  .tag-sm { font-size: 10px; }
-  .phosphor-img.logo-main { width: 80px; height: 70px; }
   .boot { font-size: 11px; }
   .section { padding: 10px 0; }
   .section-hd { font-size: 10px; }
@@ -1227,7 +1167,6 @@ body {
   .bezel-tag { font-size: 7px; gap: 6px; bottom: 8px; }
   .bezel-tag .led { width: 6px; height: 6px; }
   .bezel-tag .copyleft { display: none; }
-  .socfoot { font-size: 10px; }
 }
 
 /* Nine labels stop fitting one row at about here — the breakpoint is where
@@ -1243,9 +1182,7 @@ body {
 
 @media (max-width: 380px) {
   .terminal { font-size: 14px; padding: 8px 6px 30px; }
-  .tag-big { font-size: 28px; }
   .statusbar { font-size: 7px; gap: 4px; }
-  .phosphor-img.logo-main { width: 64px; height: 56px; }
 }
 
 @media (max-width: 600px) {
@@ -1261,21 +1198,28 @@ body {
   .scanlines::after,
   .crt.flicker .screen,
   .crt.jitter .terminal,
-  .phosphor-img.logo-main,
+  .phosphor-img.neofetch-logo,
   .bezel-tag .led.on,
   .bezel-tag .led.standby,
   .cursor,
   .socrow:hover::before,
   .crt.degaussing .raster,
   .crt.degaussing .degauss-fx,
+  .crt.warming .dot,
   .crt.collapsing .dot {
     animation: none !important;
   }
-  /* power off still has to happen, just without the wobble and the punch */
+  /* the tube still has to switch, just without the wobble and the punch */
   .crt.collapsing .raster {
     animation: none !important;
     opacity: 0;
     transition: opacity 200ms linear;
+  }
+  .crt.warming .raster {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+    filter: none;
   }
   .raster.wiping { animation: none !important; opacity: 0; }
   .terminal { scroll-behavior: auto; }
