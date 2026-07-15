@@ -310,6 +310,30 @@ body {
 .crt.powered-off .converge-edge { opacity: 0; }
 .crt.powered-off::before { opacity: 0; }
 
+/* ---- power on: the cathode heats, then the picture climbs out ---- */
+
+.crt.warming .raster {
+  animation: crt-warmup 760ms cubic-bezier(0.22, 1, 0.3, 1) forwards;
+  pointer-events: none;
+}
+@keyframes crt-warmup {
+  0%   { transform: scale(0.05, 0.004); filter: brightness(10) contrast(2); opacity: 0; }
+  10%  { transform: scale(0.9, 0.005);  filter: brightness(9) contrast(1.8); opacity: 1; }
+  26%  { transform: scale(1.01, 0.012); filter: brightness(6) contrast(1.5); }
+  48%  { transform: scale(1, 0.42);     filter: brightness(2.6) contrast(1.2); }
+  70%  { transform: scale(1, 1.03);     filter: brightness(1.6); }
+  85%  { transform: scale(1, 0.995);    filter: brightness(1.18); }
+  100% { transform: scale(1, 1);        filter: brightness(1); }
+}
+
+/* the flash of the beam striking a cold tube */
+.crt.warming .dot { animation: warm-flash 300ms ease-out forwards; }
+@keyframes warm-flash {
+  0%   { opacity: 0.9; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px;
+         box-shadow: 0 0 26px 10px var(--glow), 0 0 60px 20px color-mix(in oklab, var(--glow) 60%, transparent); }
+  100% { opacity: 0; width: 2px; height: 2px; margin: -1px 0 0 -1px; box-shadow: none; }
+}
+
 /* the last white dot, decaying like real phosphor */
 .dot {
   position: absolute;
@@ -1060,13 +1084,44 @@ body {
 
 /* ====================== MATRIX & CATS ====================== */
 
+/* the canvas reads --fg/--bg back out of here, so it follows the phosphor */
 .matrix {
+  display: block;
   width: 100%;
-  height: 200px;
+  height: 300px;
   color: var(--fg);
   background: var(--bg);
-  margin: 8px 0;
-  border: 1px solid color-mix(in oklab, var(--fg) 30%, transparent);
+  margin: 6px 0;
+  border: 1px solid color-mix(in oklab, var(--fg) 22%, transparent);
+}
+
+/* ====================== PROCEDURAL DEMO ====================== */
+
+.demo {
+  position: relative;
+  margin: 6px 0;
+  border: 1px solid color-mix(in oklab, var(--fg) 22%, transparent);
+  overflow: hidden;
+}
+.demo-out {
+  font-family: 'VT323', 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: pre;
+  color: var(--fg);
+  text-shadow: var(--text-shadow);
+  min-height: 338px;   /* DEMO_ROWS x line-height, so it can't jump on start */
+  margin: 0;
+}
+.demo-tag {
+  position: absolute;
+  top: 5px; right: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  pointer-events: none;
 }
 
 .catart {

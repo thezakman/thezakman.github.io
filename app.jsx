@@ -18,7 +18,7 @@ const SOCIALS = [
   { glyph: '▶', name: 'steam',      handle: 'thezakman87',    url: 'http://steamcommunity.com/id/thezakman87',                 kb: '888K', mtime: 'Dec 24  2022' },
 ];
 
-const CMDS = ['about', 'social', 'donate', 'contact', 'neofetch', 'matrix', 'cats', 'date', 'clear'];
+const CMDS = ['about', 'social', 'donate', 'contact', 'neofetch', 'matrix', 'demo', 'date', 'clear'];
 
 /* The function-key strip every DOS-era file manager ended with. The digit
    is real: F1-F9 fire it, and so does Alt+digit, since macOS eats bare
@@ -36,8 +36,8 @@ const HELP = [
   ['contact',    'how to reach me'],
   ['neofetch',   'system summary'],
   ['matrix',     'you already know'],
-  ['cats',       '17527 of them'],
-  ['date',       'utc, always'],
+  ['demo',       'a random procedural effect'],
+  ['date',       'the clock on my desk'],
   ['degauss',    'fire the coil'],
   ['sound',      'let the flyback sing'],
   ['clear',      'wipe the phosphor'],
@@ -46,18 +46,35 @@ const HELP = [
 
 /* Everything tab-completable, including what the button bar doesn't show. */
 const COMPLETIONS = [
-  'about', 'beer', 'cats', 'clear', 'contact', 'date', 'degauss', 'donate',
-  'exit', 'hardware', 'help', 'irc', 'ls', 'ls -la', 'matrix', 'mute',
-  'neofetch', 'poweroff', 'shutdown', 'social', 'sound', 'specs', 'unmute',
-  'whoami',
+  'about', 'beer', 'cats', 'clear', 'contact', 'date', 'degauss', 'demo',
+  'donate', 'exit', 'fx', 'hardware', 'help', 'irc', 'ls', 'ls -la', 'matrix',
+  'mute', 'neofetch', 'poweroff', 'shutdown', 'social', 'sound', 'specs',
+  'unmute', 'whoami',
 ];
 
 /* ==================== helpers ==================== */
 
+/* This box sits on a desk in Rio, and a terminal reads its own clock — not
+   the visitor's, and not UTC. `contact` already says the machine is at
+   UTC-3/America/Sao_Paulo; the status bar just wasn't listening.
+   Resolved through Intl so it stays right from any visitor's timezone, and
+   the offset is read back rather than hardcoded — Brazil dropped DST in
+   2019 but has flip-flopped on that before. */
+const TZ = 'America/Sao_Paulo';
+
+const timeFmt = new Intl.DateTimeFormat('en-CA', {
+  timeZone: TZ,
+  year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', second: '2-digit',
+  hourCycle: 'h23',
+  timeZoneName: 'shortOffset',
+});
+
 function nowStr() {
-  const d = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
+  const p = timeFmt.formatToParts(new Date())
+    .reduce((a, x) => (a[x.type] = x.value, a), {});
+  const off = (p.timeZoneName || 'GMT-3').replace('GMT', 'UTC');
+  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second} ${off}`;
 }
 
 function uptimeSince(start) {
@@ -281,7 +298,38 @@ function useCrtSound(enabled, volume) {
     src.start(t);
   }, []);
 
-  return { setPowered, degaussSound, powerOffSound };
+  /* the clack of the switch and the flyback spinning up to pitch */
+  const powerOnSound = useCallback(() => {
+    const a = rig.current;
+    if (!a) return;
+    const { ctx, master } = a;
+    a.ctx.resume();
+    const t = ctx.currentTime;
+
+    const clack = ctx.createOscillator();
+    clack.type = 'square';
+    clack.frequency.setValueAtTime(180, t);
+    clack.frequency.exponentialRampToValueAtTime(60, t + 0.07);
+    const cg = ctx.createGain();
+    cg.gain.setValueAtTime(0.28, t);
+    cg.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+    clack.connect(cg); cg.connect(master);
+    clack.start(t); clack.stop(t + 0.1);
+
+    /* the horizontal oscillator sliding up to lock */
+    const sweep = ctx.createOscillator();
+    sweep.type = 'sine';
+    sweep.frequency.setValueAtTime(4000, t + 0.05);
+    sweep.frequency.exponentialRampToValueAtTime(15734, t + 0.7);
+    const sg = ctx.createGain();
+    sg.gain.setValueAtTime(0.0001, t + 0.05);
+    sg.gain.exponentialRampToValueAtTime(0.03, t + 0.2);
+    sg.gain.exponentialRampToValueAtTime(0.0001, t + 0.75);
+    sweep.connect(sg); sg.connect(master);
+    sweep.start(t + 0.05); sweep.stop(t + 0.8);
+  }, []);
+
+  return { setPowered, degaussSound, powerOffSound, powerOnSound };
 }
 
 /* ==================== type-on hook ==================== */
@@ -477,41 +525,294 @@ function StatusBar({ bootStart, phosphor }) {
 
 /* ==================== matrix rain ==================== */
 
+/* Every column runs its own speed, trail length and reset odds — a single
+   shared cadence is what made the old one read as a screensaver. The head
+   glyph burns near-white and the trail decays behind it, glyphs mutate in
+   place, and the whole thing takes its colour from the live phosphor. */
+const GLYPHS = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホミムメモヤユヨラリルレロワヲン0123456789THEZAKMAN:."=*+-<>¦'.split('');
+
 function MatrixRain() {
   const ref = useRef(null);
+
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
-    const dpr = window.devicePixelRatio || 1;
-    const w = canvas.clientWidth;
-    const h = 200;
-    canvas.width = w * dpr;
-    canvas.height = h * dpr;
-    canvas.style.height = h + 'px';
-    const ctx = canvas.getContext('2d');
-    ctx.scale(dpr, dpr);
-    const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ01THEZAKMAN'.split('');
-    const cols = Math.floor(w / 12);
-    const drops = Array(cols).fill(0).map(() => Math.random() * h);
-    let raf;
-    const draw = () => {
-      ctx.fillStyle = 'rgba(2, 9, 6, 0.18)';
+
+    const ctx = canvas.getContext('2d', { alpha: false });
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const CELL = 14, FONT = 15;
+    let w = 0, h = 0, cols = [];
+
+    const phosphor = getComputedStyle(canvas);
+    const fg = phosphor.color;
+    const bg = phosphor.backgroundColor;
+
+    const rgb = fg.match(/[\d.]+/g).map(Number);
+    const shade = (a) => `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`;
+    /* the leading glyph is hotter than the phosphor can render — that's
+       what makes it read as a strike rather than a bright letter */
+    const head = `rgb(${Math.min(255, rgb[0] + 150)}, ${Math.min(255, rgb[1] + 90)}, ${Math.min(255, rgb[2] + 150)})`;
+
+    const layout = () => {
+      w = canvas.clientWidth;
+      h = canvas.clientHeight;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = bg;
       ctx.fillRect(0, 0, w, h);
-      ctx.font = '16px VT323, monospace';
-      ctx.fillStyle = getComputedStyle(canvas).color;
-      for (let i = 0; i < drops.length; i++) {
-        const ch = chars[Math.floor(Math.random() * chars.length)];
-        ctx.fillText(ch, i * 12, drops[i]);
-        drops[i] += 14;
-        if (drops[i] > h && Math.random() > 0.96) drops[i] = 0;
+      const n = Math.ceil(w / CELL);
+      cols = Array.from({ length: n }, () => ({
+        y: Math.random() * -40,
+        speed: 0.35 + Math.random() * 0.85,
+        len: 8 + Math.floor(Math.random() * 22),
+        chars: [],
+      }));
+    };
+    layout();
+
+    const ro = new ResizeObserver(layout);
+    ro.observe(canvas);
+
+    let raf = 0, last = 0, running = true;
+
+    const draw = (now) => {
+      if (!running) return;
+      const dt = Math.min(50, now - (last || now));
+      last = now;
+
+      /* fade rather than clear: the trails are phosphor decay */
+      ctx.fillStyle = bg.replace(/rgba?\(([^)]+)\)/, (m, p) => {
+        const c = p.split(',').map(s => parseFloat(s));
+        return `rgba(${c[0]}, ${c[1]}, ${c[2]}, 0.10)`;
+      });
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillRect(0, 0, w, h);
+      ctx.font = `${FONT}px VT323, monospace`;
+      ctx.textBaseline = 'top';
+
+      const step = dt / 16.67;
+      for (let i = 0; i < cols.length; i++) {
+        const c = cols[i];
+        const prev = Math.floor(c.y);
+        c.y += c.speed * step;
+        const row = Math.floor(c.y);
+
+        if (row !== prev) {
+          c.chars.unshift(GLYPHS[(Math.random() * GLYPHS.length) | 0]);
+          if (c.chars.length > c.len) c.chars.length = c.len;
+        }
+        /* a glyph already on screen sometimes flips to another */
+        if (c.chars.length && Math.random() < 0.06) {
+          c.chars[(Math.random() * c.chars.length) | 0] = GLYPHS[(Math.random() * GLYPHS.length) | 0];
+        }
+
+        for (let j = 0; j < c.chars.length; j++) {
+          const y = (row - j) * CELL;
+          if (y < -CELL || y > h) continue;
+          if (j === 0) {
+            ctx.fillStyle = head;
+            ctx.shadowColor = fg;
+            ctx.shadowBlur = 8;
+          } else {
+            ctx.fillStyle = shade(Math.max(0, 1 - j / c.len) * 0.85);
+            ctx.shadowBlur = 0;
+          }
+          ctx.fillText(c.chars[j], i * CELL, y);
+        }
+        ctx.shadowBlur = 0;
+
+        if ((row - c.chars.length) * CELL > h && Math.random() < 0.03) {
+          c.y = -Math.random() * 20;
+          c.speed = 0.35 + Math.random() * 0.85;
+          c.len = 8 + Math.floor(Math.random() * 22);
+          c.chars = [];
+        }
       }
       raf = requestAnimationFrame(draw);
     };
-    draw();
-    const stop = setTimeout(() => cancelAnimationFrame(raf), 6000);
-    return () => { cancelAnimationFrame(raf); clearTimeout(stop); };
+
+    /* scroll it out of the tube and it stops costing frames */
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting && !raf) { running = true; last = 0; raf = requestAnimationFrame(draw); }
+      else if (!e.isIntersecting && raf) { running = false; cancelAnimationFrame(raf); raf = 0; }
+    }, { threshold: 0.01 });
+    io.observe(canvas);
+
+    return () => { running = false; cancelAnimationFrame(raf); io.disconnect(); ro.disconnect(); };
   }, []);
-  return <canvas className="matrix" ref={ref}></canvas>;
+
+  return <canvas className="matrix" ref={ref} aria-label="matrix rain" />;
+}
+
+/* ==================== procedural demos ====================
+   Each effect is just intensity = f(x, y, t) over centred, aspect-corrected
+   coordinates; the renderer maps that through an ASCII ramp. Drawn as text
+   rather than to a canvas, so it inherits the phosphor glow, the scanlines
+   and the tube's curvature instead of sitting on top of them as a pasted
+   rectangle. */
+
+const ASCII_RAMP = ' .:-=+*#%@';
+
+/* Coordinates follow the demoscene convention: y spans -0.5..0.5 and x is
+   scaled by the aspect `k`, so nothing comes out an ellipse. Effects get k
+   too — a 21:9 tube is nearly 4 units wide, and anything that places its
+   features in ±0.6 ends up huddled in the middle of the screen. */
+const DEMOS = [
+  {
+    name: 'plasma',
+    fn: (x, y, t) => {
+      const v = Math.sin(x * 4 + t)
+              + Math.sin(y * 5 - t * 0.8)
+              + Math.sin((x + y) * 3 + t * 1.2)
+              + Math.sin(Math.hypot(x, y) * 7 - t * 1.7);
+      return (v + 4) / 8;
+    },
+  },
+  {
+    name: 'tunnel',
+    fn: (x, y, t) => {
+      const r = Math.hypot(x, y) + 1e-3;
+      const a = Math.atan2(y, x);
+      const v = Math.sin(0.5 / r * 5 + t * 3) * 0.5 + Math.sin(a * 6 - t) * 0.5;
+      return ((v + 1) / 2) * Math.min(1, r * 3.5);
+    },
+  },
+  {
+    name: 'metaballs',
+    fn: (x, y, t, k) => {
+      let s = 0;
+      for (let i = 0; i < 4; i++) {
+        const bx = Math.sin(t * (0.7 + i * 0.23) + i * 2.1) * k * 0.6;
+        const by = Math.cos(t * (0.5 + i * 0.31) + i * 1.3) * 0.32;
+        s += 0.03 / ((x - bx) ** 2 + (y - by) ** 2 + 0.003);
+      }
+      return Math.min(1, s * 0.6);
+    },
+  },
+  {
+    name: 'ripples',
+    fn: (x, y, t, k) => {
+      let s = 0;
+      for (let i = 0; i < 4; i++) {
+        const px = Math.sin(i * 2.3 + 1) * k * 0.7;
+        const py = Math.cos(i * 3.1) * 0.34;
+        const d = Math.hypot(x - px, y - py);
+        s += Math.sin(d * 16 - t * 4 + i) / (1 + d * 1.6);
+      }
+      /* only the crests light up — a trough that lands on mid-grey paints
+         the whole background a flat '+' */
+      return Math.max(0, s);
+    },
+  },
+  {
+    name: 'moire',
+    fn: (x, y, t, k) => {
+      const o = Math.sin(t * 0.6) * k * 0.4;
+      const a = Math.hypot(x - o, y) * 22;
+      const b = Math.hypot(x + o, y) * 22;
+      return (Math.sin(a) * Math.sin(b) + 1) / 2;
+    },
+  },
+  {
+    name: 'vortex',
+    fn: (x, y, t) => {
+      const r = Math.hypot(x, y);
+      const a = Math.atan2(y, x) + r * 4 - t * 1.5;
+      return (Math.sin(a * 3) * Math.cos(r * 8 - t * 2) + 1) / 2;
+    },
+  },
+  {
+    name: 'interference',
+    fn: (x, y, t, k) => {
+      /* two point sources beating against each other, like the moire but
+         travelling — the crests drift instead of standing still */
+      const o = k * 0.45;
+      const d1 = Math.hypot(x - o, y);
+      const d2 = Math.hypot(x + o, y);
+      const v = Math.sin(d1 * 14 - t * 3) + Math.sin(d2 * 14 - t * 3);
+      return (v + 2) / 4;
+    },
+  },
+];
+
+const DEMO_ROWS = 26;
+
+function DemoFX() {
+  const ref = useRef(null);
+  const pick = useRef(null);
+  if (!pick.current) pick.current = DEMOS[(Math.random() * DEMOS.length) | 0];
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const { fn } = pick.current;
+    const H = DEMO_ROWS;
+    let W = 80;
+
+    /* Measure the advance with an absolutely-positioned inline span that
+       inherits the <pre>'s font. It has to be inline — a block's scrollWidth
+       is floored at its clientWidth, so measuring that way just hands back
+       the box width and the field comes out 2.4x too narrow. */
+    const measure = () => {
+      const span = document.createElement('span');
+      span.textContent = 'M'.repeat(100);
+      span.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;';
+      el.appendChild(span);
+      const cw = span.getBoundingClientRect().width / 100;
+      span.remove();
+      if (cw > 0.5) W = Math.max(24, Math.min(240, Math.floor(el.clientWidth / cw)));
+    };
+    measure();
+    /* VT323 may still be in flight on first paint, and the fallback is a
+       wider face — remeasure once it lands */
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+
+    const t0 = performance.now();
+    let raf = 0, running = false, last = 0;
+
+    const frame = (now) => {
+      if (!running) return;
+      raf = requestAnimationFrame(frame);
+      if (now - last < 33) return;         // 30fps is plenty for ASCII
+      last = now;
+
+      const t = (now - t0) / 1000;
+      /* Char cells are about twice as tall as wide, so the field is W/(H*2)
+         as wide as it is tall. y spans 1 unit; x spans k of them. */
+      const k = W / (H * 2);
+      let out = '';
+      for (let j = 0; j < H; j++) {
+        const y = j / (H - 1) - 0.5;
+        for (let i = 0; i < W; i++) {
+          const x = (i / (W - 1) - 0.5) * k;
+          let v = fn(x, y, t, k);
+          v = v < 0 ? 0 : v > 1 ? 1 : v;
+          out += ASCII_RAMP[Math.min(ASCII_RAMP.length - 1, (v * ASCII_RAMP.length) | 0)];
+        }
+        out += '\n';
+      }
+      el.textContent = out;
+    };
+
+    /* scrolled out of the tube, it stops costing frames */
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting && !running) { running = true; last = 0; raf = requestAnimationFrame(frame); }
+      else if (!e.isIntersecting && running) { running = false; cancelAnimationFrame(raf); }
+    }, { threshold: 0.01 });
+    io.observe(el);
+
+    return () => { running = false; cancelAnimationFrame(raf); io.disconnect(); ro.disconnect(); };
+  }, []);
+
+  return (
+    <div className="demo">
+      <pre className="demo-out" ref={ref} aria-hidden="true" />
+      <span className="demo-tag dim">{pick.current.name}</span>
+    </div>
+  );
 }
 
 /* ==================== main app ==================== */
@@ -549,6 +850,7 @@ function App() {
      still there when it comes back — same as unplugging a real display. */
   const [power, setPower] = useState('on');   // 'on' | 'off'
   const [collapsing, setCollapsing] = useState(false);
+  const [warming, setWarming] = useState(false);
   const [degaussing, setDegaussing] = useState(false);
   const [wiping, setWiping] = useState(false);
   const timers = useRef([]);
@@ -576,10 +878,17 @@ function App() {
     after(620, () => { setPower('off'); setCollapsing(false); });
   }, [after, sound]);
 
+  /* A tube doesn't just appear. The cathode has to heat before it emits, so
+     the picture arrives as a dot, springs into a line, opens vertically,
+     overshoots and settles — then the coil fires. Sequenced rather than
+     simultaneous: both animate .raster, so running them together means one
+     silently wins. */
   const powerOn = useCallback(() => {
     setPower('on');
+    setWarming(true);
+    sound.powerOnSound();
     sound.setPowered(true);
-    degauss();
+    after(760, () => { setWarming(false); degauss(); });
     after(60, () => { if (inputRef.current) inputRef.current.focus(); });
   }, [after, degauss, sound]);
 
@@ -760,7 +1069,11 @@ function App() {
       out = { kind: 'hardware' };
     } else if (c === 'matrix') {
       out = { kind: 'matrix' };
+    } else if (c === 'demo' || c === 'fx') {
+      out = { kind: 'demo' };
     } else if (c === 'cats' || c === 'cat cats') {
+      /* off the strip and out of help, but neofetch's "17527 cat photos"
+         sets it up, so it stays here for anyone who goes looking */
       out = { kind: 'cats' };
     } else if (c === 'date') {
       out = { kind: 'text', text: nowStr() };
@@ -849,6 +1162,7 @@ function App() {
         v.jitter && 'jitter',
         power === 'off' && 'powered-off',
         collapsing && 'collapsing',
+        warming && 'warming',
         degaussing && 'degaussing',
       ].filter(Boolean).join(' ')}
       style={cssVars}
@@ -962,6 +1276,7 @@ function App() {
                   );
                   if (h.kind === 'hardware') return <NeofetchBlock key={i} />;
                   if (h.kind === 'matrix') return <MatrixRain key={i} />;
+                  if (h.kind === 'demo') return <DemoFX key={i} />;
                   if (h.kind === 'cats') return (
                     <div key={i} className="out">
                       <pre className="catart">{String.raw`
