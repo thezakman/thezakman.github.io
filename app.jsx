@@ -75,31 +75,39 @@ function phosphorShadow(glow, bloom, converge, color) {
   return layers.join(', ');
 }
 
-/* Where the phosphor gave up. Rolled once per session and held in a ref,
-   so the specks stay put while you use the terminal but no two visits get
-   the same damaged tube. Kept off the extreme edges, where the vignette
-   would swallow them. */
-function rollDeadPixels(n = 5) {
-  const px = [];
-  for (let i = 0; i < n; i++) {
-    px.push({
-      x: 5 + Math.random() * 90,
-      y: 8 + Math.random() * 84,
-      /* exactly one stuck-on speck: the dark ones only show over text,
-         so without it the damage would be invisible on a black screen */
-      stuck: i === 0,
-      size: Math.random() < 0.25 ? 3 : 2,
-    });
-  }
+/* Where the phosphor gave up.
+   Most tubes are fine, so most sessions roll no damage at all — a speck
+   every visitor sees is decoration, one you only sometimes catch is a
+   find. When a tube does come up damaged it always gets one stuck-on
+   speck, because the dark ones only announce themselves when text runs
+   under them and a purely dark roll would read as nothing. */
+function rollDeadPixels(chance) {
+  if (Math.random() >= chance) return [];
+
+  const speck = (stuck) => ({
+    x: 5 + Math.random() * 90,
+    y: 8 + Math.random() * 84,
+    stuck,
+    size: Math.random() < 0.25 ? 3 : 2,
+  });
+
+  const px = [speck(true)];
+  const dark = Math.floor(Math.random() * 3); // plus 0–2 dead ones
+  for (let i = 0; i < dark; i++) px.push(speck(false));
   return px;
 }
 
-function DeadPixels() {
-  const px = useRef(null);
-  if (px.current === null) px.current = rollDeadPixels();
+/* Held in a ref rather than state: the tube's damage must not move while
+   you're using the terminal, but it should re-roll if the odds change. */
+function DeadPixels({ chance }) {
+  const cache = useRef({ chance: null, px: [] });
+  if (cache.current.chance !== chance) {
+    cache.current = { chance, px: rollDeadPixels(chance) };
+  }
+  if (cache.current.px.length === 0) return null;
   return (
     <div className="deadpix">
-      {px.current.map((p, i) => (
+      {cache.current.px.map((p, i) => (
         <span
           key={i}
           className={`px ${p.stuck ? 'stuck' : 'dead'}`}
@@ -329,6 +337,7 @@ function App() {
     "emission": 0.8,
     "converge": 0.5,
     "burnin": 0.55,
+    "deadpix": 0.2,
     "grime": true,
     "flicker": true,
     "jitter": true,
@@ -623,7 +632,7 @@ function App() {
             <>
               <div className="dust"></div>
               <div className="smudge"></div>
-              <DeadPixels />
+              <DeadPixels chance={v.deadpix} />
             </>
           )}
 
@@ -805,6 +814,7 @@ function App() {
               <TweakToggle label="Flicker" value={v.flicker} onChange={(x) => setTweak('flicker', x)} />
               <TweakToggle label="Jitter" value={v.jitter} onChange={(x) => setTweak('jitter', x)} />
               <TweakToggle label="Dust & wear" value={v.grime} onChange={(x) => setTweak('grime', x)} />
+              <TweakSlider label="Dead pixel odds" value={v.deadpix} min={0} max={1} step={0.05} onChange={(x) => setTweak('deadpix', x)} />
             </TweakSection>
             <TweakSection title="Typography">
               <TweakRadio
