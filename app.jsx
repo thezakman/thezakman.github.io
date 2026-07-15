@@ -664,19 +664,20 @@ const ASCII_RAMP = ' .:-=+*#%@';
 
 const shade = (v) => ASCII_RAMP[v <= 0 ? 0 : v >= 1 ? 9 : (v * 10) | 0];
 
-/* Demoscene coordinates: y spans -0.5..0.5 and x is scaled by the aspect
-   k, so nothing comes out an ellipse. Effects get k too — a 21:9 tube is
-   nearly 4 units wide, and anything placing its features within ±0.6 ends
-   up huddled in the middle of the screen. */
+/* Demoscene coordinates: y spans -0.5..0.5, and x spans -hw..hw where hw
+   is the half-width in those same units, so nothing comes out an ellipse.
+   Effects get hw because the tube is wide and its exact width depends on
+   the viewport — anything placing its features at fixed offsets either
+   huddles in the middle of the screen or walks straight off the edge. */
 function field(fn) {
   return (W, H) => {
-    const k = W / (H * 2);
+    const hw = W / (H * 4);
     return (t) => {
       let out = '';
       for (let j = 0; j < H; j++) {
         const y = j / (H - 1) - 0.5;
         for (let i = 0; i < W; i++) {
-          out += shade(fn((i / (W - 1) - 0.5) * k, y, t, k));
+          out += shade(fn((i / (W - 1) - 0.5) * hw * 2, y, t, hw));
         }
         out += '\n';
       }
@@ -773,6 +774,11 @@ function caDemo(rule, seedRandom) {
       rows.push(n);
       if (rows.length > H) rows.shift();
     };
+    /* A single seed grows one cell per side per generation, so on a wide
+       tube it spends its first several seconds as a small triangle adrift
+       in the middle. Pre-roll enough generations for the pattern to reach
+       both edges before anyone sees it. */
+    if (!seedRandom) for (let i = 0; i < W; i++) next();
     return (t, dt) => {
       acc += dt;
       while (acc > 55) { next(); acc -= 55; }
@@ -809,30 +815,36 @@ function tenPrintDemo(W, H) {
 function cubeDemo(W, H) {
   const V = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];
   const E = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
-  const scale = H * 0.34;
+  const scale = H * 0.36;
+  /* A cube is square, so one of them fills the height and leaves most of a
+     21:9 tube empty. Three, out of phase, is what a demo would have done
+     with the room. */
+  const N = Math.max(1, Math.min(3, Math.round(W / (scale * 5))));
   return (t) => {
     const g = new Uint8Array(W * H);
-    const a = t * 0.7, b = t * 0.47;
-    const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
-    const p = V.map(([x, y, z]) => {
-      const X = x * ca - z * sa;
-      let Z = x * sa + z * ca;
-      const Y = y * cb - Z * sb;
-      Z = y * sb + Z * cb;
-      const d = 3.6 / (Z + 4.2);
-      /* x gets twice the scale: char cells are half as wide as they're tall */
-      return [W / 2 + X * d * scale * 2, H / 2 + Y * d * scale];
-    });
     const plot = (x, y) => {
       const xi = Math.round(x), yi = Math.round(y);
       if (xi >= 0 && xi < W && yi >= 0 && yi < H) g[yi * W + xi] = 1;
     };
-    for (const [i, j] of E) {
-      let [x0, y0] = p[i];
-      const [x1, y1] = p[j];
-      const steps = Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0) * 2)) || 1;
-      const dx = (x1 - x0) / steps, dy = (y1 - y0) / steps;
-      for (let s = 0; s <= steps; s++) plot(x0 + dx * s, y0 + dy * s);
+    for (let c = 0; c < N; c++) {
+      const cx = W * (c + 0.5) / N;
+      const a = t * 0.7 + c * 1.1, b = t * 0.47 + c * 0.6;
+      const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
+      const p = V.map(([x, y, z]) => {
+        const X = x * ca - z * sa;
+        let Z = x * sa + z * ca;
+        const Y = y * cb - Z * sb;
+        Z = y * sb + Z * cb;
+        const d = 3.6 / (Z + 4.2);
+        /* x gets twice the scale: char cells are half as wide as they're tall */
+        return [cx + X * d * scale * 2, H / 2 + Y * d * scale];
+      });
+      for (const [i, j] of E) {
+        const [x0, y0] = p[i], [x1, y1] = p[j];
+        const steps = Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0) * 2)) || 1;
+        const dx = (x1 - x0) / steps, dy = (y1 - y0) / steps;
+        for (let s = 0; s <= steps; s++) plot(x0 + dx * s, y0 + dy * s);
+      }
     }
     let out = '';
     for (let j = 0; j < H; j++) {
@@ -931,28 +943,30 @@ const DEMOS = [
       return (v + 1) / 2 * Math.min(1, r * 3.5);
     }) },
 
-  { name: 'metaballs', make: field((x, y, t, k) => {
+  /* the blobs are sized in y-units but spread across x, so they have to
+     ride hw or they drift off the side of a wide tube */
+  { name: 'metaballs', make: field((x, y, t, hw) => {
       let s = 0;
-      for (let i = 0; i < 4; i++) {
-        const bx = Math.sin(t * (0.7 + i * 0.23) + i * 2.1) * k * 0.6;
+      for (let i = 0; i < 5; i++) {
+        const bx = Math.sin(t * (0.7 + i * 0.23) + i * 2.1) * hw * 0.78;
         const by = Math.cos(t * (0.5 + i * 0.31) + i * 1.3) * 0.32;
-        s += 0.03 / ((x - bx) ** 2 + (y - by) ** 2 + 0.003);
+        s += 0.05 / ((x - bx) ** 2 + (y - by) ** 2 + 0.004);
       }
       return Math.min(1, s * 0.6);
     }) },
 
-  { name: 'ripples', make: field((x, y, t, k) => {
+  { name: 'ripples', make: field((x, y, t, hw) => {
       let s = 0;
       for (let i = 0; i < 4; i++) {
-        const d = Math.hypot(x - Math.sin(i * 2.3 + 1) * k * 0.7, y - Math.cos(i * 3.1) * 0.34);
+        const d = Math.hypot(x - Math.sin(i * 2.3 + 1) * hw * 0.8, y - Math.cos(i * 3.1) * 0.34);
         s += Math.sin(d * 16 - t * 4 + i) / (1 + d * 1.6);
       }
       /* crests only — a trough landing on mid-grey paints the background flat */
       return Math.max(0, s);
     }) },
 
-  { name: 'moire', make: field((x, y, t, k) => {
-      const o = Math.sin(t * 0.6) * k * 0.4;
+  { name: 'moire', make: field((x, y, t, hw) => {
+      const o = Math.sin(t * 0.6) * hw * 0.5;
       return (Math.sin(Math.hypot(x - o, y) * 22) * Math.sin(Math.hypot(x + o, y) * 22) + 1) / 2;
     }) },
 
@@ -1031,7 +1045,11 @@ function DemoFX() {
     const frame = (now) => {
       if (!running) return;
       raf = requestAnimationFrame(frame);
-      const dt = now - (last || now);
+      /* prime the clock on the first frame and bail — deriving dt from an
+         unset `last` gives 0, which fails the throttle below and returns
+         before `last` is ever assigned, so nothing draws again */
+      if (!last) { last = now; return; }
+      const dt = now - last;
       if (dt < 33) return;                 // 30fps is plenty for ASCII
       last = now;
       if (draw) el.textContent = draw((now - t0) / 1000, Math.min(80, dt));
