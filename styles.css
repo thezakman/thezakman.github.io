@@ -448,6 +448,62 @@ body {
     radial-gradient(46% 40% at 94% 96%, rgba(60, 190, 255, 0.035), transparent 70%);
 }
 
+/* ====================== THE ROOM ON THE GLASS ======================
+   Everything else here lives behind the glass. This is the only layer in
+   front of it, and it's the one that gives the tube depth: it slides
+   against the picture as the viewer moves (--vx/--vy, set on rAF from the
+   pointer), the way a real reflection sits on a plane of its own.
+
+   `screen` blend so it only ever adds light — glass can't make the phosphor
+   darker — and no blur filter, because the whole point is that the sharp
+   text underneath stays sharp. */
+
+.reflection {
+  position: absolute;
+  inset: -14%;
+  z-index: 13;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: var(--reflection, 0.7);
+  /* the tube is convex, so the room slides the same way the head does but
+     nowhere near as far */
+  transform:
+    translate3d(calc(var(--vx, 0) * 2.2%), calc(var(--vy, 0) * 3.4%), 0)
+    scale(1.02);
+  will-change: transform;
+  background:
+    /* a window, off to the upper left */
+    linear-gradient(112deg,
+      transparent 14%,
+      rgba(206, 226, 255, 0.052) 19%,
+      rgba(206, 226, 255, 0.062) 25%,
+      transparent 30%,
+      transparent 34%,
+      rgba(206, 226, 255, 0.03) 38%,
+      rgba(206, 226, 255, 0.036) 43%,
+      transparent 48%),
+    /* the ceiling light behind the viewer, smeared by the curve */
+    radial-gradient(38% 22% at 74% 12%, rgba(226, 238, 255, 0.05), transparent 70%),
+    /* the viewer's own silhouette: darker centre, brighter shoulders. Barely
+       there, but it's what stops the glass reading as a flat gel */
+    radial-gradient(46% 58% at 50% 118%, rgba(150, 180, 220, 0.028), transparent 72%);
+}
+
+/* the curve gathers the room into a bright rim near the edges */
+.reflection::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 116% at 50% 50%,
+      transparent 62%,
+      rgba(190, 214, 245, 0.03) 88%,
+      rgba(190, 214, 245, 0.055) 100%);
+}
+
+/* nothing to reflect off a tube that's been switched off */
+.crt.powered-off .reflection { opacity: calc(var(--reflection, 0.7) * 0.45); }
+
 /* ====================== EMISSION ======================
    The tube is the only light source: it lifts the bezel around it
    and throws a wash onto the wall behind the whole housing. */
@@ -718,6 +774,19 @@ body {
   gap: 4px 24px;
   max-width: 880px;
 }
+
+/* label/value pairs, aligned by the grid rather than by padded strings */
+.out.kv {
+  display: grid;
+  grid-template-columns: 6em minmax(0, 1fr);
+  gap: 2px 14px;
+  margin: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  max-width: 560px;
+}
+.out.kv dt { opacity: 0.48; }
+.out.kv dd { margin: 0; }
 .out p { margin: 2px 0; }
 
 .dim { opacity: 0.48; }

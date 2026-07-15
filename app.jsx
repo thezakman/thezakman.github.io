@@ -167,6 +167,56 @@ function rndHex(len = 8) {
   return s;
 }
 
+/* ==================== the glass has a front and a back ====================
+   A reflection that never moves is just a light patch painted on the
+   phosphor. What sells glass as a physical surface sitting in front of the
+   picture is parallax: the room slides across it as you shift, while the
+   image underneath stays put. The pointer stands in for where your head is.
+
+   Written straight to CSS custom properties on rAF rather than through
+   React state, because this fires on every mouse move and has no business
+   re-rendering the terminal to move a highlight. */
+function useViewerParallax(ref, enabled) {
+  useEffect(() => {
+    if (!enabled) return;
+    const el = ref.current;
+    if (!el) return;
+    /* a pointer is a head; a finger is not — and coarse pointers have no
+       hover position to track anyway */
+    if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+    if (prefersReducedMotion()) return;
+
+    let tx = 0, ty = 0, cx = 0, cy = 0, raf = 0;
+
+    const onMove = (e) => {
+      const r = el.getBoundingClientRect();
+      tx = ((e.clientX - r.left) / r.width - 0.5) * 2;   // -1..1
+      ty = ((e.clientY - r.top) / r.height - 0.5) * 2;
+      if (!raf) raf = requestAnimationFrame(tick);
+    };
+    const onLeave = () => { tx = 0; ty = 0; if (!raf) raf = requestAnimationFrame(tick); };
+
+    const tick = () => {
+      /* ease toward the pointer: glass doesn't snap, and raw mouse deltas
+         read as jitter on something this subtle */
+      cx += (tx - cx) * 0.08;
+      cy += (ty - cy) * 0.08;
+      el.style.setProperty('--vx', cx.toFixed(4));
+      el.style.setProperty('--vy', cy.toFixed(4));
+      raf = (Math.abs(tx - cx) > 0.001 || Math.abs(ty - cy) > 0.001)
+        ? requestAnimationFrame(tick) : 0;
+    };
+
+    window.addEventListener('pointermove', onMove, { passive: true });
+    window.addEventListener('pointerleave', onLeave, { passive: true });
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerleave', onLeave);
+      cancelAnimationFrame(raf);
+    };
+  }, [ref, enabled]);
+}
+
 /* The CSS @media rule can't reach an animation driven by requestAnimationFrame,
    and matrix and demo are by far the most motion-heavy things here — the two
    that most need to hold still. They render one frame and stop instead of
@@ -957,6 +1007,151 @@ function antDemo(W, H) {
   };
 }
 
+/* ---- the donut. Andy Sloane's torus, which is the reason anyone believes
+   ASCII can do 3D. Surface normals shaded by a Lambert term against a fixed
+   light, z-buffered so the far side is properly hidden. ---- */
+function donutDemo(W, H) {
+  const LUM = '.,-~:;=!*#$@';
+  const zbuf = new Float32Array(W * H);
+  const out = new Array(W * H);
+  const R1 = 1, R2 = 2, K2 = 5;
+  const K1 = H * 0.92;   // sized off the height: a donut is round, not wide
+  return (t) => {
+    zbuf.fill(0);
+    out.fill(' ');
+    const A = t * 0.9, B = t * 0.45;
+    const cA = Math.cos(A), sA = Math.sin(A), cB = Math.cos(B), sB = Math.sin(B);
+    for (let th = 0; th < 6.283; th += 0.06) {
+      const ct = Math.cos(th), st = Math.sin(th);
+      for (let ph = 0; ph < 6.283; ph += 0.018) {
+        const cp = Math.cos(ph), sp = Math.sin(ph);
+        const cx = R2 + R1 * ct, cy = R1 * st;
+        const x = cx * (cB * cp + sA * sB * sp) - cy * cA * sB;
+        const y = cx * (sB * cp - sA * cB * sp) + cy * cA * cB;
+        const z = K2 + cA * cx * sp + cy * sA;
+        const ooz = 1 / z;
+        /* x doubled because a char cell is half as wide as it is tall */
+        const xp = (W / 2 + K1 * ooz * x * 2) | 0;
+        const yp = (H / 2 - K1 * ooz * y) | 0;
+        const L = cp * ct * sB - cA * ct * sp - sA * st + cB * (cA * st - ct * sA * sp);
+        if (L <= 0 || xp < 0 || xp >= W || yp < 0 || yp >= H) continue;
+        const i = xp + yp * W;
+        if (ooz > zbuf[i]) {
+          zbuf[i] = ooz;
+          out[i] = LUM[Math.min(11, (L * 8) | 0)];
+        }
+      }
+    }
+    let s = '';
+    for (let j = 0; j < H; j++) { s += out.slice(j * W, j * W + W).join(''); s += '\n'; }
+    return s;
+  };
+}
+
+/* ---- rotozoomer: an XOR texture spun and scaled about its centre. The
+   effect every demo had once someone worked out you could skip the
+   multiply per pixel. ---- */
+function rotozoomDemo(W, H) {
+  const hw = W / (H * 4);
+  return (t) => {
+    const a = t * 0.55;
+    const z = 26 + Math.sin(t * 0.42) * 20;
+    const ca = Math.cos(a) * z, sa = Math.sin(a) * z;
+    let s = '';
+    for (let j = 0; j < H; j++) {
+      const y = j / (H - 1) - 0.5;
+      for (let i = 0; i < W; i++) {
+        const x = (i / (W - 1) - 0.5) * hw * 2;
+        const u = (x * ca - y * sa) | 0;
+        const v = (x * sa + y * ca) | 0;
+        s += shade(((u ^ v) & 31) / 31);
+      }
+      s += '\n';
+    }
+    return s;
+  };
+}
+
+/* ---- the sine scroller. Every demo ended with one. ---- */
+function scrollerDemo(W, H) {
+  const MSG = '   ***   T H E Z A K M A N   ///   T Z M - O S   ***   '
+            + 'GREETINGS TO EVERYONE STILL RUNNING A TUBE   ...   '
+            + 'ONLINE SINCE THE PHOSPHOR WAS WARM   ...   ';
+  let off = 0;
+  return (t, dt) => {
+    off += dt * 0.011;
+    const grid = new Array(W * H).fill(' ');
+    /* A long, shallow wave. Step the phase hard per column and neighbouring
+       letters land rows apart, which scatters the message into confetti —
+       the point of a scroller is that you can still read it. */
+    const amp = H * 0.34;
+    for (let i = 0; i < W; i++) {
+      const ch = MSG[(((off + i) | 0) % MSG.length + MSG.length) % MSG.length];
+      if (ch === ' ') continue;
+      const y = Math.round(H / 2 - 0.5 + Math.sin(i * 0.055 + t * 1.9) * amp);
+      if (y >= 0 && y < H) grid[y * W + i] = ch;
+    }
+    let s = '';
+    for (let j = 0; j < H; j++) { s += grid.slice(j * W, j * W + W).join(''); s += '\n'; }
+    return s;
+  };
+}
+
+/* ---- twister: a square column, each scanline rotated a little further than
+   the one above. Only the faces turned toward the viewer are drawn — draw
+   all four and let depth sort them and they overlap into a shapeless
+   column instead of a ribbon, because at any angle two of them are behind
+   the other two and span the same x. ---- */
+function twisterDemo(W, H) {
+  const R = Math.min(W * 0.17, H * 1.7);
+  return (t) => {
+    const grid = new Array(W * H).fill(' ');
+    for (let j = 0; j < H; j++) {
+      const a = t * 1.7 + j * 0.26;
+      for (let k = 0; k < 4; k++) {
+        const th1 = a + k * Math.PI / 2;
+        const th2 = th1 + Math.PI / 2;
+        /* the face's outward normal sits between its two corners */
+        const nz = Math.sin(th1 + Math.PI / 4);
+        if (nz >= 0) continue;                       // pointing away
+        const x1 = W / 2 + Math.cos(th1) * R;
+        const x2 = W / 2 + Math.cos(th2) * R;
+        /* lambert against a light off to the left and front */
+        const lit = 0.2 + Math.abs(Math.cos(th1 + Math.PI / 4)) * 0.8;
+        const lo = Math.round(Math.min(x1, x2)), hi = Math.round(Math.max(x1, x2));
+        for (let x = lo; x <= hi; x++) {
+          if (x >= 0 && x < W) grid[j * W + x] = shade(lit);
+        }
+      }
+    }
+    let s = '';
+    for (let j = 0; j < H; j++) { s += grid.slice(j * W, j * W + W).join(''); s += '\n'; }
+    return s;
+  };
+}
+
+/* ---- kefrens bars: one scanline's worth of bar, redrawn down the screen
+   with the phase advancing per row, which is what makes the column of bars
+   snake. ---- */
+function kefrensDemo(W, H) {
+  return (t) => {
+    const grid = new Array(W * H).fill(' ');
+    const half = Math.max(3, (W * 0.045) | 0);
+    for (let j = 0; j < H; j++) {
+      const cx = W / 2 + Math.sin(t * 2.1 + j * 0.28) * (W * 0.36)
+                       + Math.sin(t * 1.3 + j * 0.11) * (W * 0.08);
+      for (let d = -half; d <= half; d++) {
+        const x = Math.round(cx + d);
+        if (x < 0 || x >= W) continue;
+        grid[j * W + x] = shade(1 - Math.abs(d) / (half + 1));
+      }
+    }
+    let s = '';
+    for (let j = 0; j < H; j++) { s += grid.slice(j * W, j * W + W).join(''); s += '\n'; }
+    return s;
+  };
+}
+
 const DEMOS = [
   /* --- fields --- */
   { name: 'plasma', make: field((x, y, t) => (
@@ -1014,8 +1209,45 @@ const DEMOS = [
       return i >= 70 ? 0 : (i / 70) ** 0.55;
     }) },
 
+  { name: 'julia', make: field((x, y, t) => {
+      /* c walks the cardioid, so the set breathes instead of just sitting.
+         The body is drawn solid and the escape time is curved hard: mapping
+         it linearly against 60 iterations puts almost every outside point in
+         the first ramp step, which leaves the set as a thin outline on
+         black — dark inside, dark outside, and only the boundary visible. */
+      const MAX = 42;
+      const cr = 0.7885 * Math.cos(t * 0.32), ci = 0.7885 * Math.sin(t * 0.32);
+      let zr = x * 1.5, zi = y * 1.5, i = 0;
+      while (zr * zr + zi * zi < 4 && i < MAX) {
+        const tr = zr * zr - zi * zi + cr;
+        zi = 2 * zr * zi + ci; zr = tr; i++;
+      }
+      return i >= MAX ? 1 : (i / MAX) ** 0.35;
+    }) },
+
+  { name: 'boing', make: field((x, y, t, hw) => {
+      /* the Amiga ball: checkered sphere, spinning as it goes */
+      const bx = Math.sin(t * 1.2) * (hw - 0.36);
+      const by = 0.16 - Math.abs(Math.sin(t * 2.0)) * 0.32;
+      const dx = x - bx, dy = y - by, R = 0.33;
+      const r = Math.hypot(dx, dy);
+      if (r > R) return 0;
+      const nz = Math.sqrt(1 - (r / R) ** 2);
+      const u = Math.atan2(dx / R, nz) + t * 2.2;
+      const v = Math.asin(Math.max(-1, Math.min(1, dy / R)));
+      const check = (Math.floor(u * 2.4) + Math.floor(v * 3.2)) & 1;
+      /* a little shading so it reads as a ball and not a disc */
+      const lit = 0.55 + nz * 0.45;
+      return (check ? 0.95 : 0.4) * lit;
+    }) },
+
   /* --- everything that needs to remember something --- */
   { name: 'fire',       make: fireDemo },
+  { name: 'donut',      make: donutDemo },
+  { name: 'rotozoom',   make: rotozoomDemo },
+  { name: 'scroller',   make: scrollerDemo },
+  { name: 'twister',    make: twisterDemo },
+  { name: 'kefrens',    make: kefrensDemo },
   { name: 'life',       make: lifeDemo },
   { name: 'rule 30',    make: caDemo(30, false) },
   { name: 'rule 110',   make: caDemo(110, true) },
@@ -1118,6 +1350,7 @@ function App() {
     "emission": 0.8,
     "converge": 0.5,
     "burnin": 0.45,
+    "reflection": 0.7,
     "deadpix": 0.2,
     "grime": true,
     "sound": false,
@@ -1145,6 +1378,9 @@ function App() {
   const [degaussing, setDegaussing] = useState(false);
   const [wiping, setWiping] = useState(false);
   const timers = useRef([]);
+  const crtRef = useRef(null);
+
+  useViewerParallax(crtRef, v.reflection > 0);
 
   const after = useCallback((ms, fn) => {
     const id = setTimeout(fn, ms);
@@ -1322,6 +1558,7 @@ function App() {
     '--scanline-a': v.scanlines,
     '--emission': v.emission,
     '--burnin': v.burnin,
+    '--reflection': v.reflection,
     '--converge': `${v.converge}px`,
     '--text-shadow': phosphorShadow(v.glow, v.bloom, v.converge, ph.glow),
     '--font-body': v.font === 'vt323' ? "'VT323', 'IBM Plex Mono', monospace" : "'JetBrains Mono', 'IBM Plex Mono', monospace",
@@ -1457,6 +1694,7 @@ function App() {
         degaussing && 'degaussing',
       ].filter(Boolean).join(' ')}
       style={cssVars}
+      ref={crtRef}
     >
       <div className="bezel">
         <div className="screen">
@@ -1469,6 +1707,11 @@ function App() {
 
           {/* convergence drifts the further the beam has to travel */}
           <div className="converge-edge"></div>
+
+          {/* the room, hanging on the front of the glass. It parallaxes
+              against the picture, which is what makes the glass read as a
+              surface in front rather than a texture on top. */}
+          {v.reflection > 0 && <div className="reflection"></div>}
 
           {/* the glass itself: 30 years of dust, fingerprints and dead subpixels */}
           {v.grime && (
@@ -1530,7 +1773,7 @@ function App() {
                   );
                   if (h.kind === 'about') return (
                     <div key={i} className="out">
-                      <p>I'm a <span className="hi">Hacker  / Graphic &amp; CGI Artist</span> that loves to play guitar and mess around with python <span className="heart">{'♥'}</span></p>
+                      <p>I'm a <span className="hi">Hacker / Graphic &amp; CGI Artist</span> that loves to play guitar and mess around with python <span className="heart">{'♥'}</span></p>
                       <p>On the internet breaking and fixing stuff, since <span className="hi">1997</span>.</p>
                     </div>
                   );
@@ -1558,12 +1801,18 @@ function App() {
                     </div>
                   );
                   if (h.kind === 'contact') return (
-                    <div key={i} className="out grid2">
-                      <div><span className="dim">irc      </span> TheZakMan @ freenode</div>
-                      <div><span className="dim">email    </span> thezakman<span className="dim">[at]</span>icloud.com</div>
-                      <div><span className="dim">timezone </span> UTC-3 / America/Sao_Paulo</div>
-                      <div><span className="dim">status   </span> <span className="ok">{'●'}</span> available for freelance</div>
-                    </div>
+                    /* same dl/grid as neofetch — this block was still padding
+                       its labels with trailing spaces to line the values up */
+                    <dl key={i} className="out kv">
+                      <dt>irc</dt>
+                      <dd>TheZakMan @ freenode</dd>
+                      <dt>email</dt>
+                      <dd>thezakman<span className="dim">[at]</span>icloud.com</dd>
+                      <dt>timezone</dt>
+                      <dd>UTC-3 / America/Sao_Paulo</dd>
+                      <dt>status</dt>
+                      <dd><span className="ok">{'●'}</span> available for freelance</dd>
+                    </dl>
                   );
                   if (h.kind === 'hardware') return <NeofetchBlock key={i} />;
                   if (h.kind === 'matrix') return <MatrixRain key={i} />;
@@ -1665,6 +1914,7 @@ function App() {
               <TweakSlider label="Emission" value={v.emission} min={0} max={2} step={0.05} onChange={(x) => setTweak('emission', x)} />
               <TweakSlider label="Misconvergence" value={v.converge} min={0} max={2} step={0.1} onChange={(x) => setTweak('converge', x)} />
               <TweakSlider label="Burn-in" value={v.burnin} min={0} max={1.5} step={0.05} onChange={(x) => setTweak('burnin', x)} />
+              <TweakSlider label="Reflection" value={v.reflection} min={0} max={1.5} step={0.05} onChange={(x) => setTweak('reflection', x)} />
             </TweakSection>
             <TweakSection title="CRT">
               <TweakSlider label="Scanlines" value={v.scanlines} min={0} max={0.8} step={0.02} onChange={(x) => setTweak('scanlines', x)} />
