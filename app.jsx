@@ -646,41 +646,292 @@ function MatrixRain() {
 }
 
 /* ==================== procedural demos ====================
-   Each effect is just intensity = f(x, y, t) over centred, aspect-corrected
-   coordinates; the renderer maps that through an ASCII ramp. Drawn as text
-   rather than to a canvas, so it inherits the phosphor glow, the scanlines
-   and the tube's curvature instead of sitting on top of them as a pasted
-   rectangle. */
+   Drawn as text rather than to a canvas, so every effect inherits the
+   phosphor glow, the scanlines and the tube's curvature instead of sitting
+   on top of them as a pasted rectangle.
+
+   Contract: make(W, H) -> (t, dt) => string. A factory, not a pure
+   function, because the good effects have memory — fire propagates a
+   buffer, Life needs last generation, an attractor needs where it was.
+   Field effects that really are f(x,y,t) get wrapped by field() below.
+
+   The families are deliberately far apart. Seven flavours of sine field
+   still reads as one effect with the knobs moved, however random the pick
+   is: cellular automata, combustion, particles, 3D and escape-time
+   fractals are what actually make it feel like a different program ran. */
 
 const ASCII_RAMP = ' .:-=+*#%@';
 
-/* Coordinates follow the demoscene convention: y spans -0.5..0.5 and x is
-   scaled by the aspect `k`, so nothing comes out an ellipse. Effects get k
-   too — a 21:9 tube is nearly 4 units wide, and anything that places its
-   features in ±0.6 ends up huddled in the middle of the screen. */
+const shade = (v) => ASCII_RAMP[v <= 0 ? 0 : v >= 1 ? 9 : (v * 10) | 0];
+
+/* Demoscene coordinates: y spans -0.5..0.5 and x is scaled by the aspect
+   k, so nothing comes out an ellipse. Effects get k too — a 21:9 tube is
+   nearly 4 units wide, and anything placing its features within ±0.6 ends
+   up huddled in the middle of the screen. */
+function field(fn) {
+  return (W, H) => {
+    const k = W / (H * 2);
+    return (t) => {
+      let out = '';
+      for (let j = 0; j < H; j++) {
+        const y = j / (H - 1) - 0.5;
+        for (let i = 0; i < W; i++) {
+          out += shade(fn((i / (W - 1) - 0.5) * k, y, t, k));
+        }
+        out += '\n';
+      }
+      return out;
+    };
+  };
+}
+
+/* ---- fire: the demoscene's oldest party trick. Seed the row below the
+   screen white-hot, pull each cell from the one under it with a random
+   sideways drift, subtract a little on the way up. ---- */
+function fireDemo(W, H) {
+  const h = H + 1;
+  const buf = new Float32Array(W * h);
+  return () => {
+    for (let i = 0; i < W; i++) buf[(h - 1) * W + i] = Math.random() < 0.88 ? 1 : 0.35;
+    for (let j = 0; j < h - 1; j++) {
+      for (let i = 0; i < W; i++) {
+        const drift = ((Math.random() * 3) | 0) - 1;
+        const si = Math.min(W - 1, Math.max(0, i + drift));
+        const v = buf[(j + 1) * W + si] - Math.random() * 0.11;
+        buf[j * W + i] = v > 0 ? v : 0;
+      }
+    }
+    let out = '';
+    for (let j = 0; j < H; j++) {
+      for (let i = 0; i < W; i++) out += shade(buf[j * W + i]);
+      out += '\n';
+    }
+    return out;
+  };
+}
+
+/* ---- Conway. Reseeds when it stalls, which it always does — a still life
+   sitting there for the rest of the session is not an effect. ---- */
+function lifeDemo(W, H) {
+  const N = W * H;
+  let a = new Uint8Array(N), b = new Uint8Array(N);
+  let acc = 0, gen = 0, lastPop = -1, stale = 0;
+  const seed = () => {
+    for (let i = 0; i < N; i++) a[i] = Math.random() < 0.28 ? 1 : 0;
+    gen = 0; stale = 0; lastPop = -1;
+  };
+  seed();
+  const step = () => {
+    let pop = 0;
+    for (let j = 0; j < H; j++) {
+      const up = ((j - 1 + H) % H) * W, mid = j * W, dn = ((j + 1) % H) * W;
+      for (let i = 0; i < W; i++) {
+        const l = (i - 1 + W) % W, r = (i + 1) % W;
+        const n = a[up + l] + a[up + i] + a[up + r]
+                + a[mid + l] + a[mid + r]
+                + a[dn + l] + a[dn + i] + a[dn + r];
+        const alive = a[mid + i] ? (n === 2 || n === 3) : (n === 3);
+        b[mid + i] = alive ? 1 : 0;
+        pop += alive ? 1 : 0;
+      }
+    }
+    const tmp = a; a = b; b = tmp;
+    gen++;
+    if (pop === lastPop) stale++; else stale = 0;
+    lastPop = pop;
+    if (stale > 40 || pop < N * 0.01 || gen > 900) seed();
+  };
+  return (t, dt) => {
+    acc += dt;
+    while (acc > 85) { step(); acc -= 85; }
+    let out = '';
+    for (let j = 0; j < H; j++) {
+      for (let i = 0; i < W; i++) out += a[j * W + i] ? '#' : ' ';
+      out += '\n';
+    }
+    return out;
+  };
+}
+
+/* ---- elementary cellular automata, scrolling up. Rule 30 is Wolfram's
+   noise generator, 90 is Sierpinski, 110 is Turing complete. ---- */
+function caDemo(rule, seedRandom) {
+  return (W, H) => {
+    const rows = [];
+    const first = new Uint8Array(W);
+    if (seedRandom) for (let i = 0; i < W; i++) first[i] = Math.random() < 0.5 ? 1 : 0;
+    else first[W >> 1] = 1;
+    rows.push(first);
+    let acc = 0;
+    const next = () => {
+      const p = rows[rows.length - 1];
+      const n = new Uint8Array(W);
+      for (let i = 0; i < W; i++) {
+        const idx = (p[(i - 1 + W) % W] << 2) | (p[i] << 1) | p[(i + 1) % W];
+        n[i] = (rule >> idx) & 1;
+      }
+      rows.push(n);
+      if (rows.length > H) rows.shift();
+    };
+    return (t, dt) => {
+      acc += dt;
+      while (acc > 55) { next(); acc -= 55; }
+      const pad = H - rows.length;
+      let out = '';
+      for (let j = 0; j < H; j++) {
+        const r = j >= pad ? rows[j - pad] : null;
+        for (let i = 0; i < W; i++) out += (r && r[i]) ? '#' : ' ';
+        out += '\n';
+      }
+      return out;
+    };
+  };
+}
+
+/* ---- 10 PRINT CHR$(205.5+RND(1)); 20 GOTO 10 ---- */
+function tenPrintDemo(W, H) {
+  const rows = [];
+  const row = () => {
+    let s = '';
+    for (let i = 0; i < W; i++) s += Math.random() < 0.5 ? '/' : '\\';
+    return s;
+  };
+  for (let j = 0; j < H; j++) rows.push(row());
+  let acc = 0;
+  return (t, dt) => {
+    acc += dt;
+    while (acc > 110) { rows.push(row()); rows.shift(); acc -= 110; }
+    return rows.join('\n') + '\n';
+  };
+}
+
+/* ---- a wireframe cube, because a tube this old deserves one ---- */
+function cubeDemo(W, H) {
+  const V = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];
+  const E = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+  const scale = H * 0.34;
+  return (t) => {
+    const g = new Uint8Array(W * H);
+    const a = t * 0.7, b = t * 0.47;
+    const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
+    const p = V.map(([x, y, z]) => {
+      const X = x * ca - z * sa;
+      let Z = x * sa + z * ca;
+      const Y = y * cb - Z * sb;
+      Z = y * sb + Z * cb;
+      const d = 3.6 / (Z + 4.2);
+      /* x gets twice the scale: char cells are half as wide as they're tall */
+      return [W / 2 + X * d * scale * 2, H / 2 + Y * d * scale];
+    });
+    const plot = (x, y) => {
+      const xi = Math.round(x), yi = Math.round(y);
+      if (xi >= 0 && xi < W && yi >= 0 && yi < H) g[yi * W + xi] = 1;
+    };
+    for (const [i, j] of E) {
+      let [x0, y0] = p[i];
+      const [x1, y1] = p[j];
+      const steps = Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0) * 2)) || 1;
+      const dx = (x1 - x0) / steps, dy = (y1 - y0) / steps;
+      for (let s = 0; s <= steps; s++) plot(x0 + dx * s, y0 + dy * s);
+    }
+    let out = '';
+    for (let j = 0; j < H; j++) {
+      for (let i = 0; i < W; i++) out += g[j * W + i] ? '#' : ' ';
+      out += '\n';
+    }
+    return out;
+  };
+}
+
+/* ---- actual particles this time. The per-pixel attempt at this hashed
+   the angle into lanes and came out as scattered noise. ---- */
+function starDemo(W, H) {
+  const N = Math.max(60, ((W * H) / 7) | 0);
+  const s = Array.from({ length: N }, () => ({
+    x: Math.random() * 2 - 1, y: Math.random() * 2 - 1, z: Math.random() * 0.98 + 0.02,
+  }));
+  return (t, dt) => {
+    const g = new Array(W * H).fill(' ');
+    const step = Math.min(60, dt) * 0.00042;
+    for (const p of s) {
+      p.z -= step;
+      if (p.z <= 0.02) { p.x = Math.random() * 2 - 1; p.y = Math.random() * 2 - 1; p.z = 1; }
+      const k = 0.42 / p.z;
+      const xi = Math.round(W / 2 + p.x * k * H * 2);
+      const yi = Math.round(H / 2 + p.y * k * H);
+      if (xi < 0 || xi >= W || yi < 0 || yi >= H) continue;
+      g[yi * W + xi] = shade(Math.min(1, (1 - p.z) * 1.2) * 0.95 + 0.05);
+    }
+    let out = '';
+    for (let j = 0; j < H; j++) { out += g.slice(j * W, j * W + W).join(''); out += '\n'; }
+    return out;
+  };
+}
+
+/* ---- Lorenz. The trail decays like phosphor, which is the whole point of
+   drawing it here. ---- */
+function lorenzDemo(W, H) {
+  let x = 0.1, y = 0, z = 0;
+  const trail = new Float32Array(W * H);
+  return (t, dt) => {
+    for (let i = 0; i < trail.length; i++) trail[i] *= 0.982;
+    const n = Math.min(180, Math.max(20, (dt * 4) | 0));
+    for (let s = 0; s < n; s++) {
+      const h = 0.005;
+      const dx = 10 * (y - x), dy = x * (28 - z) - y, dz = x * y - (8 / 3) * z;
+      x += dx * h; y += dy * h; z += dz * h;
+      const xi = Math.round(W / 2 + x * (W / 62));
+      const yi = Math.round(H - 1 - z * (H / 52));
+      if (xi >= 0 && xi < W && yi >= 0 && yi < H) trail[yi * W + xi] = 1;
+    }
+    let out = '';
+    for (let j = 0; j < H; j++) {
+      for (let i = 0; i < W; i++) out += shade(trail[j * W + i]);
+      out += '\n';
+    }
+    return out;
+  };
+}
+
+/* ---- Langton's ant: two rules, and it builds a highway out of chaos after
+   about ten thousand steps. Worth the wait. ---- */
+function antDemo(W, H) {
+  const g = new Uint8Array(W * H);
+  let x = W >> 1, y = H >> 1, dir = 0;   // 0=up 1=right 2=down 3=left
+  const DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
+  let acc = 0;
+  return (t, dt) => {
+    acc += dt;
+    const steps = Math.min(900, Math.max(30, (acc * 2.2) | 0));
+    acc = 0;
+    for (let s = 0; s < steps; s++) {
+      const i = y * W + x;
+      if (g[i]) { dir = (dir + 3) & 3; g[i] = 0; } else { dir = (dir + 1) & 3; g[i] = 1; }
+      x = (x + DX[dir] + W) % W;
+      y = (y + DY[dir] + H) % H;
+    }
+    let out = '';
+    for (let j = 0; j < H; j++) {
+      for (let i = 0; i < W; i++) out += g[j * W + i] ? '#' : ' ';
+      out += '\n';
+    }
+    return out;
+  };
+}
+
 const DEMOS = [
-  {
-    name: 'plasma',
-    fn: (x, y, t) => {
-      const v = Math.sin(x * 4 + t)
-              + Math.sin(y * 5 - t * 0.8)
-              + Math.sin((x + y) * 3 + t * 1.2)
-              + Math.sin(Math.hypot(x, y) * 7 - t * 1.7);
-      return (v + 4) / 8;
-    },
-  },
-  {
-    name: 'tunnel',
-    fn: (x, y, t) => {
+  /* --- fields --- */
+  { name: 'plasma', make: field((x, y, t) => (
+      Math.sin(x * 4 + t) + Math.sin(y * 5 - t * 0.8)
+      + Math.sin((x + y) * 3 + t * 1.2) + Math.sin(Math.hypot(x, y) * 7 - t * 1.7) + 4) / 8) },
+
+  { name: 'tunnel', make: field((x, y, t) => {
       const r = Math.hypot(x, y) + 1e-3;
-      const a = Math.atan2(y, x);
-      const v = Math.sin(0.5 / r * 5 + t * 3) * 0.5 + Math.sin(a * 6 - t) * 0.5;
-      return ((v + 1) / 2) * Math.min(1, r * 3.5);
-    },
-  },
-  {
-    name: 'metaballs',
-    fn: (x, y, t, k) => {
+      const v = Math.sin(0.5 / r * 5 + t * 3) * 0.5 + Math.sin(Math.atan2(y, x) * 6 - t) * 0.5;
+      return (v + 1) / 2 * Math.min(1, r * 3.5);
+    }) },
+
+  { name: 'metaballs', make: field((x, y, t, k) => {
       let s = 0;
       for (let i = 0; i < 4; i++) {
         const bx = Math.sin(t * (0.7 + i * 0.23) + i * 2.1) * k * 0.6;
@@ -688,52 +939,52 @@ const DEMOS = [
         s += 0.03 / ((x - bx) ** 2 + (y - by) ** 2 + 0.003);
       }
       return Math.min(1, s * 0.6);
-    },
-  },
-  {
-    name: 'ripples',
-    fn: (x, y, t, k) => {
+    }) },
+
+  { name: 'ripples', make: field((x, y, t, k) => {
       let s = 0;
       for (let i = 0; i < 4; i++) {
-        const px = Math.sin(i * 2.3 + 1) * k * 0.7;
-        const py = Math.cos(i * 3.1) * 0.34;
-        const d = Math.hypot(x - px, y - py);
+        const d = Math.hypot(x - Math.sin(i * 2.3 + 1) * k * 0.7, y - Math.cos(i * 3.1) * 0.34);
         s += Math.sin(d * 16 - t * 4 + i) / (1 + d * 1.6);
       }
-      /* only the crests light up — a trough that lands on mid-grey paints
-         the whole background a flat '+' */
+      /* crests only — a trough landing on mid-grey paints the background flat */
       return Math.max(0, s);
-    },
-  },
-  {
-    name: 'moire',
-    fn: (x, y, t, k) => {
+    }) },
+
+  { name: 'moire', make: field((x, y, t, k) => {
       const o = Math.sin(t * 0.6) * k * 0.4;
-      const a = Math.hypot(x - o, y) * 22;
-      const b = Math.hypot(x + o, y) * 22;
-      return (Math.sin(a) * Math.sin(b) + 1) / 2;
-    },
-  },
-  {
-    name: 'vortex',
-    fn: (x, y, t) => {
+      return (Math.sin(Math.hypot(x - o, y) * 22) * Math.sin(Math.hypot(x + o, y) * 22) + 1) / 2;
+    }) },
+
+  { name: 'vortex', make: field((x, y, t) => {
       const r = Math.hypot(x, y);
-      const a = Math.atan2(y, x) + r * 4 - t * 1.5;
-      return (Math.sin(a * 3) * Math.cos(r * 8 - t * 2) + 1) / 2;
-    },
-  },
-  {
-    name: 'interference',
-    fn: (x, y, t, k) => {
-      /* two point sources beating against each other, like the moire but
-         travelling — the crests drift instead of standing still */
-      const o = k * 0.45;
-      const d1 = Math.hypot(x - o, y);
-      const d2 = Math.hypot(x + o, y);
-      const v = Math.sin(d1 * 14 - t * 3) + Math.sin(d2 * 14 - t * 3);
-      return (v + 2) / 4;
-    },
-  },
+      return (Math.sin((Math.atan2(y, x) + r * 4 - t * 1.5) * 3) * Math.cos(r * 8 - t * 2) + 1) / 2;
+    }) },
+
+  { name: 'mandelbrot', make: field((x, y, t) => {
+      /* orbit a known-interesting point so the zoom never lands on a void */
+      const zoom = Math.pow(2, 1 + ((t * 0.22) % 7));
+      const cx = -0.743643887 + x * 3 / zoom;
+      const cy = 0.131825904 + y * 3 / zoom;
+      let zr = 0, zi = 0, i = 0;
+      while (zr * zr + zi * zi < 4 && i < 70) {
+        const tr = zr * zr - zi * zi + cx;
+        zi = 2 * zr * zi + cy; zr = tr; i++;
+      }
+      return i >= 70 ? 0 : (i / 70) ** 0.55;
+    }) },
+
+  /* --- everything that needs to remember something --- */
+  { name: 'fire',       make: fireDemo },
+  { name: 'life',       make: lifeDemo },
+  { name: 'rule 30',    make: caDemo(30, false) },
+  { name: 'rule 110',   make: caDemo(110, true) },
+  { name: 'sierpinski', make: caDemo(90, false) },
+  { name: '10 print',   make: tenPrintDemo },
+  { name: 'cube',       make: cubeDemo },
+  { name: 'starfield',  make: starDemo },
+  { name: 'lorenz',     make: lorenzDemo },
+  { name: "langton's ant", make: antDemo },
 ];
 
 const DEMO_ROWS = 26;
@@ -746,9 +997,9 @@ function DemoFX() {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const { fn } = pick.current;
+    const { make } = pick.current;
     const H = DEMO_ROWS;
-    let W = 80;
+    let W = 0, draw = null;
 
     /* Measure the advance with an absolutely-positioned inline span that
        inherits the <pre>'s font. It has to be inline — a block's scrollWidth
@@ -761,7 +1012,11 @@ function DemoFX() {
       el.appendChild(span);
       const cw = span.getBoundingClientRect().width / 100;
       span.remove();
-      if (cw > 0.5) W = Math.max(24, Math.min(240, Math.floor(el.clientWidth / cw)));
+      if (cw <= 0.5) return;
+      const next = Math.max(24, Math.min(240, Math.floor(el.clientWidth / cw)));
+      /* the effects size their buffers to W, so a resize has to rebuild
+         them — and that necessarily restarts anything stateful */
+      if (next !== W) { W = next; draw = make(W, H); }
     };
     measure();
     /* VT323 may still be in flight on first paint, and the fallback is a
@@ -776,25 +1031,10 @@ function DemoFX() {
     const frame = (now) => {
       if (!running) return;
       raf = requestAnimationFrame(frame);
-      if (now - last < 33) return;         // 30fps is plenty for ASCII
+      const dt = now - (last || now);
+      if (dt < 33) return;                 // 30fps is plenty for ASCII
       last = now;
-
-      const t = (now - t0) / 1000;
-      /* Char cells are about twice as tall as wide, so the field is W/(H*2)
-         as wide as it is tall. y spans 1 unit; x spans k of them. */
-      const k = W / (H * 2);
-      let out = '';
-      for (let j = 0; j < H; j++) {
-        const y = j / (H - 1) - 0.5;
-        for (let i = 0; i < W; i++) {
-          const x = (i / (W - 1) - 0.5) * k;
-          let v = fn(x, y, t, k);
-          v = v < 0 ? 0 : v > 1 ? 1 : v;
-          out += ASCII_RAMP[Math.min(ASCII_RAMP.length - 1, (v * ASCII_RAMP.length) | 0)];
-        }
-        out += '\n';
-      }
-      el.textContent = out;
+      if (draw) el.textContent = draw((now - t0) / 1000, Math.min(80, dt));
     };
 
     /* scrolled out of the tube, it stops costing frames */
