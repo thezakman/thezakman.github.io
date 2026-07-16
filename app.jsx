@@ -432,7 +432,43 @@ function useCrtSound(enabled, volume) {
     o.start(t); o.stop(t + 0.02);
   }, []);
 
-  return { setPowered, degaussSound, powerOffSound, powerOnSound, keyTick };
+  /* your own keystroke: a touch louder and lower than the ghost's, with
+     the pitch wobbling so a burst of typing doesn't read as a beep */
+  const typeTick = useCallback(() => {
+    const a = rig.current;
+    if (!a) return;
+    const { ctx, master } = a;
+    a.ctx.resume();
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'square';
+    o.frequency.value = 850 + Math.random() * 500;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.028, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.022);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + 0.028);
+  }, []);
+
+  /* the chunky detent of a switch on the housing — F-keys, knobs, enter */
+  const clickSound = useCallback(() => {
+    const a = rig.current;
+    if (!a) return;
+    const { ctx, master } = a;
+    a.ctx.resume();
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'square';
+    o.frequency.setValueAtTime(620, t);
+    o.frequency.exponentialRampToValueAtTime(230, t + 0.032);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.05, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + 0.055);
+  }, []);
+
+  return { setPowered, degaussSound, powerOffSound, powerOnSound, keyTick, typeTick, clickSound };
 }
 
 /* ==================== type-on hook ==================== */
@@ -1940,7 +1976,8 @@ const GLITCH_CHARS = '!<>-_\\/[]{}=+*^?#$%&@:;'.split('');
 const PAINT_TOOLS = ['air', 'pen', 'fire', 'glitch', 'erase'];
 const MIRRORS = ['off', 'x', 'y', 'xy'];
 
-function PaintStudio({ onExit }) {
+function PaintStudio({ onExit, click }) {
+  const snd = () => { if (click) click(); };
   const preRef = useRef(null);
   const [tool, setTool] = useState('air');
   const [mirror, setMirror] = useState('off');
@@ -2152,22 +2189,22 @@ function PaintStudio({ onExit }) {
           <button
             key={tl}
             className={`pbtn ${tool === tl ? 'on' : ''}`}
-            onClick={() => setTool(tl)}
+            onClick={() => { snd(); setTool(tl); }}
           >{tl}</button>
         ))}
         <button
           className="pbtn"
-          onClick={() => setPenIdx((penIdx + 1) % PEN_CHARS.length)}
+          onClick={() => { snd(); setPenIdx((penIdx + 1) % PEN_CHARS.length); }}
           title="pen glyph"
         >[{PEN_CHARS[penIdx]}]</button>
         <button
           className="pbtn"
-          onClick={() => setMirror(MIRRORS[(MIRRORS.indexOf(mirror) + 1) % MIRRORS.length])}
+          onClick={() => { snd(); setMirror(MIRRORS[(MIRRORS.indexOf(mirror) + 1) % MIRRORS.length]); }}
         >mir:{mirror}</button>
         <span className="paint-spacer"></span>
-        <button className="pbtn" onClick={clearAll}>clear</button>
-        <button className="pbtn" onClick={save}>copy</button>
-        <button className="pbtn warn" onClick={onExit}>exit</button>
+        <button className="pbtn" onClick={() => { snd(); clearAll(); }}>clear</button>
+        <button className="pbtn" onClick={() => { snd(); save(); }}>copy</button>
+        <button className="pbtn warn" onClick={() => { snd(); onExit(); }}>exit</button>
       </div>
       <pre
         className="paint-canvas"
@@ -2367,6 +2404,7 @@ function MatrixWhisper({ tick, onDone }) {
 
 function WakeIntro({ onDone, tick }) {
   const [txt, setTxt] = useState('');
+  const [out, setOut] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -2397,7 +2435,11 @@ function WakeIntro({ onDone, tick }) {
       await type('Wake up...');
       await wait(1100); await erase(); await wait(350);
       await type('The Matrix has you.');
-      await wait(1300);
+      await wait(1200);
+      /* the line doesn't fade — the signal carrying it tears */
+      if (!alive) return;
+      setOut(true);
+      await wait(380);
       if (alive) onDone();
     })();
 
@@ -2405,7 +2447,7 @@ function WakeIntro({ onDone, tick }) {
   }, []);
 
   return (
-    <div className="wake-intro" aria-hidden="true">
+    <div className={`wake-intro ${out ? 'out' : ''}`} aria-hidden="true">
       {txt}<span className="cursor">{'█'}</span>
     </div>
   );
@@ -2477,8 +2519,11 @@ function App() {
 
   const [v, setTweak] = (window.useTweaks || ((d) => [d, () => {}]))(tweaksDefaults);
 
-  /* boot phase: wake -> boot -> done */
-  const [phase, setPhase] = useState('wake');
+  /* boot phase: gate -> wake -> boot -> done.
+     The gate exists for one reason: browsers keep audio locked until a
+     real gesture, so the visitor turns the monitor on themselves — and
+     everything after that first click gets to make noise. */
+  const [phase, setPhase] = useState('gate');
   const [bootStart] = useState(Date.now());
   const [bootDone, setBootDone] = useState(0);
   const totalBoot = 8;
@@ -2495,6 +2540,7 @@ function App() {
   const [saver, setSaver] = useState(false);
   const [whisper, setWhisper] = useState(false);
   const [paint, setPaint] = useState(false);
+  const [osEnter, setOsEnter] = useState(false);
 
   /* the two knobs every tube had. They detent through three positions
      and actually drive the picture — glow and scanline depth. */
@@ -2544,14 +2590,35 @@ function App() {
     after(60, () => { if (inputRef.current) inputRef.current.focus(); });
   }, [after, degauss, sound]);
 
-  /* A tube doesn't open on a full picture. First load runs the same
-     cathode warm-up the power switch does — the raster climbs out of a
-     line while the BIOS is already typing into it — and then the coil
-     fires, like every CRT ever made. */
-  useEffect(() => {
+  /* A tube doesn't open on a full picture. Leaving the gate runs the
+     same cathode warm-up the power switch does — clack, the raster
+     climbs out of a line while the whisper starts typing into it, and
+     then the coil fires, like every CRT ever made. */
+  const jacked = useRef(false);
+  const jackTime = useRef(0);
+  const jackIn = useCallback(() => {
+    if (jacked.current) return;
+    jacked.current = true;
+    jackTime.current = Date.now();
+    setPhase('wake');
+    sound.powerOnSound();
+    sound.setPowered(true);
     setWarming(true);
     after(760, () => { setWarming(false); degauss(); });
-  }, []);
+  }, [after, degauss, sound]);
+
+  useEffect(() => {
+    if (phase !== 'gate') return;
+    const go = () => jackIn();
+    window.addEventListener('pointerdown', go);
+    window.addEventListener('keydown', go);
+    window.addEventListener('touchstart', go);
+    return () => {
+      window.removeEventListener('pointerdown', go);
+      window.removeEventListener('keydown', go);
+      window.removeEventListener('touchstart', go);
+    };
+  }, [phase, jackIn]);
 
   /* A monitor left off is not necessarily alone. Give the dark a moment
      to settle first — the delay is rolled so it never knocks on schedule. */
@@ -2608,6 +2675,7 @@ function App() {
       const hit = FKEYS.find(f => f.n === n);
       if (!hit) return;
       e.preventDefault();
+      sound.clickSound();
       runCommandRef.current(hit.cmd);
     };
     window.addEventListener('keydown', onKey);
@@ -2636,7 +2704,12 @@ function App() {
 
   useEffect(() => {
     if (phase !== 'boot' && phase !== 'wake') return;
-    const handler = () => skipBoot();
+    /* the click that opened the gate must not also skip the intro —
+       its pointerdown/click pair straddles the phase change */
+    const handler = () => {
+      if (Date.now() - jackTime.current < 600) return;
+      skipBoot();
+    };
     window.addEventListener('click', handler);
     window.addEventListener('touchstart', handler);
     window.addEventListener('keydown', handler);
@@ -2687,6 +2760,17 @@ function App() {
     if (phase === 'done' && inputRef.current) {
       inputRef.current.focus();
     }
+  }, [phase]);
+
+  /* Entering the OS is a video-mode switch: the picture rolls up, loses
+     v-hold for a beat, and snaps into sync — with the relay clacking.
+     Runs once, whether the boot played out or got skipped. */
+  useEffect(() => {
+    if (phase !== 'done') return;
+    setOsEnter(true);
+    sound.clickSound();
+    const id = setTimeout(() => setOsEnter(false), 800);
+    return () => clearTimeout(id);
   }, [phase]);
 
   useEffect(() => {
@@ -2835,6 +2919,9 @@ function App() {
   runCommandRef.current = runCommand;
 
   const handleKey = (e) => {
+    /* the keyboard is part of the machine: keys tick, enter clunks */
+    if (e.key === 'Enter') sound.clickSound();
+    else if (e.key.length === 1 || e.key === 'Backspace') sound.typeTick();
     if (e.key === 'Enter') {
       runCommand(input);
       setInput('');
@@ -2952,11 +3039,20 @@ function App() {
           <div className="dot"></div>
           <div className="degauss-fx"></div>
 
-          <div className={`raster ${wiping ? 'wiping' : ''}`}>
+          <div className={`raster ${wiping ? 'wiping' : ''} ${osEnter ? 'os-enter' : ''}`}>
 
-          <StatusBar bootStart={bootStart} phosphor={v.phosphor} />
+          {/* no signal, no status: the bar only exists once the tube is lit */}
+          {phase !== 'gate' && <StatusBar bootStart={bootStart} phosphor={v.phosphor} />}
 
           <div className="terminal" ref={scrollRef}>
+
+            {/* === GATE: turn the monitor on yourself === */}
+            {phase === 'gate' && (
+              <div className="gate">
+                <div className="gate-power">{'⏻'}</div>
+                <div className="gate-hint">click to jack in</div>
+              </div>
+            )}
 
             {/* === WAKE: the film's opening, before the BIOS === */}
             {phase === 'wake' && (
@@ -3000,7 +3096,7 @@ function App() {
                   if (h.kind === 'help') return (
                     <div key={i} className="out help">
                       {HELP.map(([cmd, what]) => (
-                        <button key={cmd} className="help-row" onClick={() => runCommand(cmd)}>
+                        <button key={cmd} className="help-row" onClick={() => { sound.typeTick(); runCommand(cmd); }}>
                           <span className="help-cmd">{cmd}</span>
                           <span className="help-what">{what}</span>
                         </button>
@@ -3099,13 +3195,13 @@ function App() {
                 />
                 <span className="cursor">{'█'}</span>
               </div>
-              <FKeyBar onRun={runCommand} />
+              <FKeyBar onRun={(cmd) => { sound.clickSound(); runCommand(cmd); }} />
             </div>
           )}
 
           {/* the studio takes the raster over, same plane as the saver */}
           {paint && phase === 'done' && power === 'on' && (
-            <PaintStudio onExit={() => {
+            <PaintStudio click={v.sound ? sound.clickSound : null} onExit={() => {
               setPaint(false);
               setTimeout(() => { if (inputRef.current) inputRef.current.focus(); }, 60);
             }} />
@@ -3160,6 +3256,7 @@ function App() {
               className="knob"
               style={{ '--rot': `${knobB * 55 - 55}deg` }}
               onClick={() => {
+                sound.clickSound();
                 const n = (knobB + 1) % BRIGHT_STEPS.length;
                 setKnobB(n);
                 setTweak('glow', BRIGHT_STEPS[n]);
@@ -3174,6 +3271,7 @@ function App() {
               className="knob"
               style={{ '--rot': `${knobC * 55 - 55}deg` }}
               onClick={() => {
+                sound.clickSound();
                 const n = (knobC + 1) % CONTRAST_STEPS.length;
                 setKnobC(n);
                 setTweak('scanlines', CONTRAST_STEPS[n]);
@@ -3186,14 +3284,14 @@ function App() {
             </button>
             <button
               className={`hw-btn snd ${v.sound ? 'lit' : ''}`}
-              onClick={() => setTweak('sound', !v.sound)}
+              onClick={() => { sound.clickSound(); setTweak('sound', !v.sound); }}
               title={v.sound ? 'Mute the tube' : 'Let the tube sing (15.7kHz flyback)'}
               aria-label={v.sound ? 'Mute the monitor' : 'Unmute the monitor'}
               aria-pressed={v.sound}
             >{v.sound ? '♪' : '⃠'}</button>
             <button
               className="hw-btn"
-              onClick={degauss}
+              onClick={() => { sound.clickSound(); degauss(); }}
               disabled={power === 'off'}
               title="Degauss"
               aria-label="Degauss the tube"

@@ -1267,10 +1267,85 @@ body {
 .boot .warn { color: #ffb070; padding: 0 6px; }
 .boot .trail { margin-left: 6px; }
 
+/* ====================== THE GATE ======================
+   The monitor waits for you to switch it on. One click buys the browser
+   gesture that unlocks audio — after this, everything gets a voice. */
+
+.gate {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  cursor: pointer;
+  user-select: none;
+}
+.gate-power {
+  font-size: 58px;
+  line-height: 1;
+  opacity: 0.4;
+  text-shadow: var(--text-shadow);
+  animation: gate-pulse 2.8s ease-in-out infinite;
+}
+.gate-hint {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  opacity: 0.35;
+  animation: gate-pulse 2.8s ease-in-out 0.2s infinite;
+}
+@keyframes gate-pulse {
+  0%, 100% { opacity: 0.22; }
+  50%      { opacity: 0.6; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gate-power, .gate-hint { animation: none; opacity: 0.45; }
+}
+
 /* the film's opening line, waiting alone on the dark tube */
 .wake-intro {
   padding: 13% 6% 0;
   min-height: 1.4em;
+}
+
+/* The exit isn't a fade — the signal carrying the line tears. Hard cuts
+   (steps) instead of tweens: sync loss doesn't interpolate. */
+.wake-intro.out { animation: wake-glitch 380ms steps(1, end) forwards; }
+@keyframes wake-glitch {
+  0%   { transform: none;                          opacity: 1;    filter: brightness(1); }
+  14%  { transform: translateX(8px) skewX(-5deg);  opacity: 1;    filter: brightness(2.6); }
+  28%  { transform: translateX(-11px) skewX(4deg); opacity: 0.55; filter: brightness(0.8); }
+  42%  { transform: translateX(4px);               opacity: 1;    filter: brightness(3.2); }
+  58%  { transform: translateX(-17px) skewX(7deg); opacity: 0.22; filter: brightness(0.5); }
+  74%  { transform: translateX(6px) skewX(-2deg);  opacity: 0.65; filter: brightness(1.8); }
+  100% { transform: translateX(0);                 opacity: 0;    filter: brightness(0.2); }
+}
+
+/* ====================== ENTERING THE OS ======================
+   A real mode switch never cut cleanly: the new picture rolled up the
+   tube, slipped past, and the v-hold caught it on the way back. The
+   bars arrive a beat later from their own edges — the OS assembling
+   itself rather than appearing. */
+
+.raster.os-enter {
+  animation: os-roll 680ms cubic-bezier(0.2, 0.8, 0.25, 1);
+}
+@keyframes os-roll {
+  0%   { transform: translateY(56%) scaleY(1.14); filter: brightness(2.4) contrast(1.35); opacity: 0.3; }
+  32%  { transform: translateY(-4%) scaleY(0.99); filter: brightness(1.5); opacity: 1; }
+  54%  { transform: translateY(1.8%);             filter: brightness(1.15); }
+  74%  { transform: translateY(-0.6%);            filter: brightness(1.05); }
+  100% { transform: none;                          filter: none; }
+}
+.os-enter .statusbar { animation: bar-drop 380ms 160ms ease-out backwards; }
+@keyframes bar-drop {
+  from { transform: translateY(-110%); opacity: 0; }
+}
+.os-enter .screen-bottom { animation: bar-rise 380ms 240ms ease-out backwards; }
+@keyframes bar-rise {
+  from { transform: translateY(110%); opacity: 0; }
 }
 
 .boot-skip-hint {
@@ -1865,9 +1940,14 @@ body {
   .terminal .out,
   .terminal .line,
   .saver-hint,
-  .motes span {
+  .motes span,
+  .wake-intro.out,
+  .raster.os-enter,
+  .os-enter .statusbar,
+  .os-enter .screen-bottom {
     animation: none !important;
   }
+  .wake-intro.out { opacity: 0; }
   .saver-hint { opacity: 0.3; }
   .motes { display: none; }
   /* the tube still has to switch, just without the wobble and the punch */
