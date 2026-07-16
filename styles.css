@@ -70,7 +70,9 @@ body {
   flex-direction: column;
 }
 
-/* brushed plastic texture */
+/* brushed plastic texture — and the uneven UV yellowing every beige
+   shell earned by 2003. The tint blotches are what age actually looks
+   like: sun through a window, always from one side. */
 .bezel::before {
   content: '';
   position: absolute; inset: 0;
@@ -79,7 +81,26 @@ body {
     repeating-linear-gradient(90deg, rgba(255,255,255,0.008) 0 1px, transparent 1px 3px),
     repeating-linear-gradient(180deg, rgba(255,255,255,0.004) 0 1px, transparent 1px 5px),
     radial-gradient(ellipse at 25% 5%, rgba(255,255,255,0.06), transparent 30%),
-    radial-gradient(ellipse at 75% 95%, rgba(255,255,255,0.02), transparent 30%);
+    radial-gradient(ellipse at 75% 95%, rgba(255,255,255,0.02), transparent 30%),
+    radial-gradient(ellipse 60% 45% at 82% 12%, rgba(148, 112, 44, 0.055), transparent 62%),
+    radial-gradient(ellipse 45% 60% at 8% 78%, rgba(128, 98, 42, 0.04), transparent 58%),
+    radial-gradient(ellipse 30% 22% at 55% 100%, rgba(140, 105, 40, 0.045), transparent 66%);
+  pointer-events: none;
+}
+
+/* the desk the monitor actually sits on: a contact shadow that pools
+   under the housing and hardens at the feet */
+.crt::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  transform: translateX(-50%);
+  width: min(1300px, 92%);
+  height: 30px;
+  background: radial-gradient(48% 100% at 50% 100%, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.3) 60%, transparent 78%);
+  filter: blur(7px);
+  z-index: 0;
   pointer-events: none;
 }
 
@@ -214,6 +235,32 @@ body {
   letter-spacing: 0.06em;
   color: #26231d;
   white-space: nowrap;
+}
+
+/* ====================== BEZEL SHEEN ======================
+   The room's light lying on the plastic. It rides the same --vx/--vy the
+   glass reflection does, so moving your head walks a highlight along the
+   top bevel and trades the flank catch from one side to the other —
+   the housing reads as a molded object, not a frame drawn around one. */
+
+.bezel-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 4;
+  background:
+    /* the long catch on the top bevel, sliding against the head */
+    radial-gradient(55% 30px at calc(50% - var(--vx, 0) * 28%) 0%,
+      rgba(255, 246, 224, 0.10), transparent 100%),
+    /* the flanks trade the light as you cross the centreline */
+    radial-gradient(26px 50% at 0% calc(46% - var(--vy, 0) * 18%),
+      rgba(255, 246, 224, calc(0.03 + var(--vx, 0) * 0.03)), transparent 100%),
+    radial-gradient(26px 50% at 100% calc(46% - var(--vy, 0) * 18%),
+      rgba(255, 246, 224, calc(0.03 - var(--vx, 0) * 0.03)), transparent 100%),
+    /* desk light grazing the chin */
+    radial-gradient(40% 22px at calc(50% + var(--vx, 0) * 20%) 100%,
+      rgba(255, 246, 224, 0.026), transparent 100%);
 }
 
 /* four philips screws holding the shell together */
@@ -798,6 +845,40 @@ body {
   line-height: 1.7;
   opacity: 0.72;
 }
+/* The pills. Green burns hotter than anything else the phosphor has
+   drawn; blue is the only foreign colour this monitor has ever shown —
+   which is exactly why the choice lands. */
+.whisper-pills {
+  margin-top: 1.5em;
+  display: flex;
+  align-items: baseline;
+  gap: 30px;
+  pointer-events: auto;
+}
+.pill {
+  background: none;
+  border: 0;
+  padding: 2px 4px;
+  font: inherit;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+}
+.pill.green {
+  color: #4dff88;
+  text-shadow: 0 0 6px rgba(70, 255, 140, 0.95), 0 0 22px rgba(70, 255, 140, 0.5);
+}
+.pill.blue {
+  color: #5d8cff;
+  text-shadow: 0 0 6px rgba(90, 130, 255, 0.9), 0 0 20px rgba(90, 130, 255, 0.45);
+}
+.pill:hover { filter: brightness(1.35); }
+.pill:focus-visible { outline: 1px solid currentColor; outline-offset: 3px; }
+.pill-hint {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  opacity: 0.35;
+}
+
 .whisper-rabbit {
   position: absolute;
   bottom: 18%;
@@ -841,6 +922,25 @@ body {
   100% { transform: translate3d(var(--mdx, 10px), var(--mdy, -14px), 0); }
 }
 
+/* Room dust: in front of the whole monitor, tinted by the phosphor and
+   masked to the cone of emitted light — a grain drifting past the dark
+   corner of the room simply isn't lit, so it isn't there. This is what
+   makes the glow read as light in the air instead of a halo decal. */
+.motes.room {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  transition: opacity 0.5s ease;
+  -webkit-mask-image: radial-gradient(56% 62% at 50% 46%, #000 30%, transparent 76%);
+  mask-image: radial-gradient(56% 62% at 50% 46%, #000 30%, transparent 76%);
+}
+.motes.room span {
+  background: color-mix(in oklab, var(--glow) 72%, #fff);
+  box-shadow: 0 0 3px color-mix(in oklab, var(--glow) 45%, transparent);
+}
+/* tube off, light off — the dust is still there, you just can't see it */
+.crt.powered-off .motes.room { opacity: 0.1; }
+
 /* nothing to reflect off a tube that's been switched off */
 .crt.powered-off .reflection { opacity: calc(var(--reflection, 0.7) * 0.45); }
 
@@ -853,9 +953,15 @@ body {
   position: absolute; inset: 0;
   pointer-events: none;
   z-index: 0;
-  background: radial-gradient(46% 42% at 50% 48%,
-    color-mix(in oklab, var(--glow) 7%, transparent),
-    transparent 78%);
+  /* two falloffs: the tight halo hugging the housing, and the wide wash
+     the room actually gets — one gradient alone reads as a spotlight */
+  background:
+    radial-gradient(34% 30% at 50% 46%,
+      color-mix(in oklab, var(--glow) 9%, transparent),
+      transparent 72%),
+    radial-gradient(52% 48% at 50% 48%,
+      color-mix(in oklab, var(--glow) 6%, transparent),
+      transparent 80%);
   filter: blur(60px);
   opacity: var(--emission, 0.8);
   transition: opacity 0.4s ease;
@@ -1161,6 +1267,12 @@ body {
 .boot .warn { color: #ffb070; padding: 0 6px; }
 .boot .trail { margin-left: 6px; }
 
+/* the film's opening line, waiting alone on the dark tube */
+.wake-intro {
+  padding: 13% 6% 0;
+  min-height: 1.4em;
+}
+
 .boot-skip-hint {
   font-family: 'JetBrains Mono', monospace;
   font-size: 10px;
@@ -1262,36 +1374,101 @@ body {
 }
 @keyframes standbypulse { 50% { opacity: 0.35; } }
 
-.hw-controls { display: flex; align-items: center; gap: 8px; }
+/* the control cluster owns the left end of the chin; the ratings
+   sticker balances it on the right */
+.hw-controls {
+  position: absolute;
+  left: 34px;
+  bottom: 13px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
 
+/* detented knobs — ribbed cap, indicator line, real function */
+.knob {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.knob-cap {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background:
+    repeating-conic-gradient(rgba(255, 255, 255, 0.05) 0 8deg, transparent 8deg 16deg),
+    radial-gradient(circle at 35% 28%, #3b362e, #16130f 72%);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.14),
+    0 1px 2px rgba(0, 0, 0, 0.85);
+  transform: rotate(var(--rot, 0deg));
+  transition: transform 140ms cubic-bezier(0.3, 1.4, 0.6, 1);
+}
+.knob-cap::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 2px;
+  width: 2px;
+  height: 7px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: #948a76;
+}
+.knob-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 6.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #564e45;
+}
+.knob:hover .knob-label { color: #8a7f6e; }
+.knob:focus-visible { outline: 1px solid var(--fg); outline-offset: 2px; border-radius: 4px; }
+
+/* One family of switches: every button on the chin is the same fat
+   detented block — a real front panel was molded in one pass, not three. */
 .hw-btn {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #6e675c;
-  background: linear-gradient(180deg, #2b2721 0%, #16130f 100%);
+  color: #7d7466;
+  background: linear-gradient(180deg, #332e27 0%, #1a1612 55%, #100d0a 100%);
   border: 1px solid #0b0908;
-  border-radius: 3px;
-  padding: 4px 8px;
+  border-radius: 4px;
+  height: 30px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 1px 2px rgba(0, 0, 0, 0.8);
+    inset 0 2px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.7),
+    0 2px 3px rgba(0, 0, 0, 0.8);
   transition: color 100ms, transform 60ms;
 }
 .hw-btn:hover:not(:disabled) { color: #a89a86; }
 .hw-btn:active:not(:disabled) {
-  transform: translateY(1px);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.9);
+  transform: translateY(2px);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.95);
 }
+/* the note glyph needs more point size to weigh the same as the labels */
+.hw-btn.snd { font-size: 13px; padding: 0 12px; }
 .hw-btn:focus-visible { outline: 1px solid var(--fg); outline-offset: 2px; }
 .hw-btn:disabled { opacity: 0.35; cursor: default; }
 .hw-btn.power {
-  font-size: 11px;
+  font-size: 15px;
   letter-spacing: 0;
-  padding: 3px 8px;
   line-height: 1;
+  padding: 0 16px;
 }
 .hw-btn.lit {
   color: var(--fg);
@@ -1587,6 +1764,7 @@ body {
   .bezel { padding: 10px 10px 36px; border-radius: 20px; }
   /* the thin mobile bezel has no plastic left to emboss or screw into */
   .bezel-brand, .screws, .vents, .serial { display: none; }
+  .hw-controls { left: 10px; bottom: 5px; gap: 6px; }
   .bezel::after { top: 6px; left: 6px; right: 6px; bottom: 32px; border-radius: 14px; }
   .statusbar { font-size: 9px; gap: 10px; padding: 8px 10px; }
   .terminal { padding: 12px 12px 60px; font-size: 17px; }
@@ -1663,7 +1841,12 @@ body {
   .ls { font-size: 10.5px; }
   .lsrow { grid-template-columns: 3.2em auto auto 1fr; gap: 0 0.7em; }
   .lsrow .perm, .lsrow .mtime, .lsrow .dim { display: none; }
-  .bezel-tag .hw-btn { font-size: 7px; padding: 3px 6px; }
+  .bezel-tag .hw-btn { font-size: 7px; height: 21px; padding: 0 7px; }
+  .bezel-tag .hw-btn.snd { font-size: 10px; padding: 0 7px; }
+  .bezel-tag .hw-btn.power { font-size: 11px; padding: 0 9px; }
+  .knob-label { display: none; }
+  .knob-cap { width: 16px; height: 16px; }
+  .bezel-sheen { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

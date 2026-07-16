@@ -1553,12 +1553,18 @@ function matrixDemo(W, H) {
   const FRESH = 'TZAKMN0123456789XKRWBQ$#@%&';
   const MID = '=+*:;!?7412';
   const OLD = '.,:\'';
-  const cols = Array.from({ length: W }, () => ({
-    y: -Math.random() * H * 2,
-    speed: rnd(0.25, 1.05),
-    len: 5 + ((Math.random() * 16) | 0),
-    chars: [],
-  }));
+  /* born mid-fall: columns start scattered through the screen with their
+     trails already grown, so the rain is raining from frame one */
+  const cols = Array.from({ length: W }, () => {
+    const len = 5 + ((Math.random() * 16) | 0);
+    const y = rnd(-H * 1.5, H);
+    const chars = [];
+    if (y > 0) {
+      const n = Math.min(len, Math.ceil(y) + 1);
+      for (let k = 0; k < n; k++) chars.push(FRESH[(Math.random() * FRESH.length) | 0]);
+    }
+    return { y, speed: rnd(0.25, 1.05), len, chars };
+  });
   return (t, dt) => {
     const grid = new Array(W * H).fill(' ');
     const step = Math.min(60, dt) / 16.7;
@@ -2186,10 +2192,34 @@ function PaintStudio({ onExit }) {
    see of *you* — all of it straight off the browser, nothing sent
    anywhere. Any key kills it, which is exactly what Neo did. */
 
-function MatrixWhisper({ user, tick, onDone }) {
+function MatrixWhisper({ tick, onDone }) {
   const [line, setLine] = useState('');
   const [trace, setTrace] = useState([]);
-  const [rabbit, setRabbit] = useState(-1);
+  const [critterX, setCritterX] = useState(-1);
+  const [pills, setPills] = useState(false);
+  const critter = useRef('(\\_/)');
+  const pillResolve = useRef(null);
+
+  const choose = (c) => {
+    if (pillResolve.current) {
+      const res = pillResolve.current;
+      pillResolve.current = null;
+      res(c);
+    }
+  };
+
+  /* while the pills are up, r/b answer the question instead of waking
+     the tube; every other key still bails out, exactly like the film */
+  useEffect(() => {
+    const k = (e) => {
+      if (!pillResolve.current) return;
+      const key = e.key.toLowerCase();
+      if (key === 'g' || key === '1') { e.preventDefault(); e.stopPropagation(); choose('green'); }
+      else if (key === 'b' || key === '2') { e.preventDefault(); e.stopPropagation(); choose('blue'); }
+    };
+    window.addEventListener('keydown', k, true);
+    return () => window.removeEventListener('keydown', k, true);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -2199,9 +2229,18 @@ function MatrixWhisper({ user, tick, onDone }) {
     (async () => {
       let cur = '';
       const put = () => { if (alive) setLine(cur); };
+      /* whoever is typing is human: sometimes they miss a key, notice,
+         and back over it */
       const type = async (text, spd = 90) => {
         for (const ch of text) {
           if (!alive) return;
+          if (ch !== ' ' && spd > 50 && Math.random() < 0.04) {
+            cur += 'qwertyuiopasdfghjklzxcvbnm'[(Math.random() * 26) | 0];
+            put(); if (tick) tick();
+            await wait(spd * 2.2);
+            cur = cur.slice(0, -1); put();
+            await wait(spd * 1.4);
+          }
           cur += ch; put();
           if (tick) tick();
           await wait(spd + Math.random() * 90);
@@ -2215,26 +2254,60 @@ function MatrixWhisper({ user, tick, onDone }) {
         }
       };
 
+      /* -- every visit gets a different séance -- */
+      const NAME = rpick(['guest', 'operator', 'stranger']);
+      const opener = rpick([
+        [`Wake up, ${NAME}...`, 'The Matrix has you...', 'Follow the white rabbit.'],
+        [`I know you're there, ${NAME}.`, 'I watched you hit the power switch.', 'It never does what you think. Look —'],
+        ['+++ CARRIER DETECTED', `dialing you back, ${NAME}...`, 'this line was never hung up.'],
+      ]);
+      /* the white rabbit, usually. this house also has cats. */
+      critter.current = rpick(['(\\_/)', '(\\_/)', '(=^.^=)']);
+
       await wait(1600);
-      await type(`Wake up, ${user}...`);
-      await wait(2000); await erase(); await wait(800);
-
-      await type('The Matrix has you...');
-      await wait(1900); await erase(); await wait(800);
-
-      await type('Follow the white rabbit.');
-      await wait(500);
+      for (let i = 0; i < opener.length; i++) {
+        await type(opener[i]);
+        await wait(i === opener.length - 1 ? 600 : 1900);
+        if (i < opener.length - 1) { await erase(); await wait(800); }
+      }
       for (let x = -6; x <= 104 && alive; x += 2.4) {
-        setRabbit(x);
+        setCritterX(x);
         await wait(46);
       }
-      setRabbit(-1);
-      await wait(500); await erase(); await wait(900);
+      setCritterX(-1);
+      await wait(400); await erase(); await wait(900);
 
-      await type(`Knock, knock, ${user}.`);
+      await type(`Knock, knock, ${NAME}.`);
       await wait(2100); await erase(); await wait(700);
 
-      /* -- beyond the script: the trace turns around and reads the reader -- */
+      if (Math.random() < 0.4) {
+        /* -- the choice. green is this tube's whole world; blue is the
+           only foreign colour it has ever shown -- */
+        await type('green pill, or blue pill?', 75);
+        if (!alive) return;
+        setPills(true);
+        const choice = await new Promise((res) => {
+          pillResolve.current = res;
+          timers.push(setTimeout(() => choose('slow'), 30000));
+        });
+        setPills(false);
+        if (!alive) return;
+        if (choice === 'green') { await wait(400); if (alive) onDone('green'); return; }
+        if (choice === 'blue') {
+          cur = ''; put();
+          await type('goodbye.', 130);
+          await wait(1600);
+          if (alive) onDone('blue');
+          return;
+        }
+        cur = ''; put();
+        await type('...too slow. the rabbit is gone.', 60);
+        await wait(1800);
+        if (alive) onDone('slow');
+        return;
+      }
+
+      /* -- or: the trace turns around and reads the reader -- */
       await type('> trace program: running', 34);
       const nav = navigator;
       const info = [
@@ -2253,8 +2326,78 @@ function MatrixWhisper({ user, tick, onDone }) {
       }
       await wait(1100);
       cur = ''; put();
-      await type('> you are already inside.', 65);
+      await type(rpick([
+        '> you are already inside.',
+        '> there is no monitor.',
+        '> the signal was never off.',
+      ]), 65);
       await wait(2400);
+      if (alive) onDone('trace');
+    })();
+
+    return () => { alive = false; timers.forEach(clearTimeout); };
+  }, []);
+
+  return (
+    <div className="whisper">
+      <div className="whisper-line">{line}<span className="cursor">{'█'}</span></div>
+      {trace.length > 0 && (
+        <div className="whisper-trace">
+          {trace.map((l, i) => <div key={i}>{l}</div>)}
+        </div>
+      )}
+      {pills && (
+        <div className="whisper-pills" onTouchStart={(e) => e.stopPropagation()}>
+          <button className="pill green" onClick={(e) => { e.stopPropagation(); choose('green'); }}>[ green ]</button>
+          <button className="pill blue" onClick={(e) => { e.stopPropagation(); choose('blue'); }}>[ blue ]</button>
+          <span className="pill-hint">g / b</span>
+        </div>
+      )}
+      {critterX >= 0 && (
+        <div className="whisper-rabbit" style={{ left: `${critterX}%` }}>{critter.current}</div>
+      )}
+    </div>
+  );
+}
+
+/* ==================== the wake intro ====================
+   The site opens the way the film did: a dark tube, someone typing at
+   you. Two lines, a few seconds, and the BIOS takes over — and like
+   everything in the boot, one tap skips straight to the shell. */
+
+function WakeIntro({ onDone, tick }) {
+  const [txt, setTxt] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    const timers = [];
+    const wait = (ms) => new Promise((res) => { timers.push(setTimeout(res, ms)); });
+
+    (async () => {
+      let cur = '';
+      const type = async (text, spd = 52) => {
+        for (const ch of text) {
+          if (!alive) return;
+          cur += ch; setTxt(cur);
+          /* the same ghost keystrokes the whisper makes — though on a
+             fresh visit the browser keeps audio locked until the first
+             touch, so the very first line may play silent */
+          if (tick) tick();
+          await wait(spd + Math.random() * 45);
+        }
+      };
+      const erase = async () => {
+        while (cur.length) {
+          if (!alive) return;
+          cur = cur.slice(0, -1); setTxt(cur);
+          await wait(15);
+        }
+      };
+      await wait(900);
+      await type('Wake up...');
+      await wait(1100); await erase(); await wait(350);
+      await type('The Matrix has you.');
+      await wait(1300);
       if (alive) onDone();
     })();
 
@@ -2262,16 +2405,8 @@ function MatrixWhisper({ user, tick, onDone }) {
   }, []);
 
   return (
-    <div className="whisper" aria-hidden="true">
-      <div className="whisper-line">{line}<span className="cursor">{'█'}</span></div>
-      {trace.length > 0 && (
-        <div className="whisper-trace">
-          {trace.map((l, i) => <div key={i}>{l}</div>)}
-        </div>
-      )}
-      {rabbit >= 0 && (
-        <div className="whisper-rabbit" style={{ left: `${rabbit}%` }}>{'(\\_/)'}</div>
-      )}
+    <div className="wake-intro" aria-hidden="true">
+      {txt}<span className="cursor">{'█'}</span>
     </div>
   );
 }
@@ -2283,21 +2418,24 @@ function MatrixWhisper({ user, tick, onDone }) {
    move without the beam's permission. Desktop-only: a phone gets held
    too close for floating dust to read as anything but dirt. */
 
-function Motes() {
+function Motes({ room }) {
   const motes = useMemo(() => {
     if (prefersReducedMotion()) return [];
     if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return [];
-    return Array.from({ length: 9 }, () => ({
-      x: rnd(4, 96), y: rnd(6, 92),
-      s: rnd(1, 2.1),
+    /* room dust hangs in the cone of light in front of the monitor —
+       more of it, bigger grains, gathered toward the tube */
+    return Array.from({ length: room ? 15 : 9 }, () => ({
+      x: room ? rnd(16, 84) : rnd(4, 96),
+      y: room ? rnd(6, 86) : rnd(6, 92),
+      s: room ? rnd(1, 2.6) : rnd(1, 2.1),
       dur: rnd(16, 38), delay: -rnd(0, 30),
       dx: rnd(-16, 16), dy: -rnd(8, 26),
-      o: rnd(0.05, 0.16),
+      o: room ? rnd(0.04, 0.13) : rnd(0.05, 0.16),
     }));
   }, []);
   if (!motes.length) return null;
   return (
-    <div className="motes" aria-hidden="true">
+    <div className={`motes ${room ? 'room' : ''}`} aria-hidden="true">
       {motes.map((m, i) => (
         <span
           key={i}
@@ -2325,7 +2463,7 @@ function App() {
     "glow": 0.7,
     "bloom": 0.5,
     "emission": 0.8,
-    "converge": 0.5,
+    "converge": 0.35,
     "burnin": 0.45,
     "reflection": 0.7,
     "deadpix": 0.2,
@@ -2339,8 +2477,8 @@ function App() {
 
   const [v, setTweak] = (window.useTweaks || ((d) => [d, () => {}]))(tweaksDefaults);
 
-  /* boot phase */
-  const [phase, setPhase] = useState('boot');
+  /* boot phase: wake -> boot -> done */
+  const [phase, setPhase] = useState('wake');
   const [bootStart] = useState(Date.now());
   const [bootDone, setBootDone] = useState(0);
   const totalBoot = 8;
@@ -2357,6 +2495,13 @@ function App() {
   const [saver, setSaver] = useState(false);
   const [whisper, setWhisper] = useState(false);
   const [paint, setPaint] = useState(false);
+
+  /* the two knobs every tube had. They detent through three positions
+     and actually drive the picture — glow and scanline depth. */
+  const [knobB, setKnobB] = useState(1);
+  const [knobC, setKnobC] = useState(1);
+  const BRIGHT_STEPS = [0.4, 0.7, 1.1];
+  const CONTRAST_STEPS = [0.15, 0.35, 0.55];
   const timers = useRef([]);
   const crtRef = useRef(null);
 
@@ -2490,7 +2635,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (phase !== 'boot') return;
+    if (phase !== 'boot' && phase !== 'wake') return;
     const handler = () => skipBoot();
     window.addEventListener('click', handler);
     window.addEventListener('touchstart', handler);
@@ -2753,6 +2898,9 @@ function App() {
         </div>
         <div className="screws" aria-hidden="true"></div>
         <div className="vents" aria-hidden="true"></div>
+        {/* the room's light on the plastic itself — it walks with your
+            head the way the glass reflection does, one layer further out */}
+        <div className="bezel-sheen" aria-hidden="true"></div>
         <div className="serial" aria-hidden="true">
           <span className="bars"></span>
           <span className="no">MOD. CRT-1987 · S/N 19870042 · 110-220V~</span>
@@ -2809,6 +2957,14 @@ function App() {
           <StatusBar bootStart={bootStart} phosphor={v.phosphor} />
 
           <div className="terminal" ref={scrollRef}>
+
+            {/* === WAKE: the film's opening, before the BIOS === */}
+            {phase === 'wake' && (
+              <WakeIntro
+                tick={v.sound ? sound.keyTick : null}
+                onDone={() => setPhase('boot')}
+              />
+            )}
 
             {/* === BOOT PHASE === */}
             {phase === 'boot' && (
@@ -2967,26 +3123,69 @@ function App() {
           {/* the tube is off. that has never stopped this text. */}
           {power === 'off' && whisper && (
             <MatrixWhisper
-              user="guest"
               tick={v.sound ? sound.keyTick : null}
-              onDone={() => {
+              onDone={(how) => {
                 setWhisper(false);
+                /* blue pill: the tube stays dark. that was the deal. */
+                if (how === 'blue') return;
                 powerOn();
                 after(1200, () => setHistory(h => [
                   ...h,
-                  { kind: 'text', text: '> trace terminated. the rabbit got away.' },
+                  { kind: 'text', text:
+                    how === 'green' ? '> good choice. the phosphor missed you.'
+                    : how === 'slow' ? '> indecision is also a choice. the tube forgives.'
+                    : '> trace terminated. the rabbit got away.' },
                 ]));
               }}
             />
           )}
         </div>
 
+        {/* the chin reads like a real front panel: ratings sticker on the
+            left, badge dead centre, controls gathered on the right */}
         <div className="bezel-tag">
           <span className={`led ${power === 'on' ? 'on' : 'standby'}`}></span>
           <span className="copyleft">since 1987 / (c) TheZakMan</span>
-          <span className="hw-controls">
+          {/* the LED has lived next to the power switch on every monitor
+              ever made — reunited here at the centre of the chin */}
+          <button
+            className="hw-btn power"
+            onClick={() => (power === 'on' ? powerOff() : powerOn())}
+            title={power === 'on' ? 'Power off' : 'Power on'}
+            aria-label={power === 'on' ? 'Power the monitor off' : 'Power the monitor on'}
+          >{'⏻'}</button>
+        </div>
+        <span className="hw-controls">
             <button
-              className={`hw-btn ${v.sound ? 'lit' : ''}`}
+              className="knob"
+              style={{ '--rot': `${knobB * 55 - 55}deg` }}
+              onClick={() => {
+                const n = (knobB + 1) % BRIGHT_STEPS.length;
+                setKnobB(n);
+                setTweak('glow', BRIGHT_STEPS[n]);
+              }}
+              title="Brightness"
+              aria-label="Brightness knob"
+            >
+              <span className="knob-cap"></span>
+              <span className="knob-label">bright</span>
+            </button>
+            <button
+              className="knob"
+              style={{ '--rot': `${knobC * 55 - 55}deg` }}
+              onClick={() => {
+                const n = (knobC + 1) % CONTRAST_STEPS.length;
+                setKnobC(n);
+                setTweak('scanlines', CONTRAST_STEPS[n]);
+              }}
+              title="Contrast (scanline depth)"
+              aria-label="Contrast knob"
+            >
+              <span className="knob-cap"></span>
+              <span className="knob-label">contr</span>
+            </button>
+            <button
+              className={`hw-btn snd ${v.sound ? 'lit' : ''}`}
               onClick={() => setTweak('sound', !v.sound)}
               title={v.sound ? 'Mute the tube' : 'Let the tube sing (15.7kHz flyback)'}
               aria-label={v.sound ? 'Mute the monitor' : 'Unmute the monitor'}
@@ -2999,15 +3198,12 @@ function App() {
               title="Degauss"
               aria-label="Degauss the tube"
             >degauss</button>
-            <button
-              className="hw-btn power"
-              onClick={() => (power === 'on' ? powerOff() : powerOn())}
-              title={power === 'on' ? 'Power off' : 'Power on'}
-              aria-label={power === 'on' ? 'Power the monitor off' : 'Power the monitor on'}
-            >{'⏻'}</button>
-          </span>
-        </div>
+        </span>
       </div>
+
+      {/* dust in the room, hanging where the tube's light can catch it —
+          in front of the whole monitor, not behind the glass */}
+      {v.grime && <Motes room />}
 
       {/* Tweaks panel */}
       {window.TweaksPanel && (() => {
