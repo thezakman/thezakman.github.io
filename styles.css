@@ -19,6 +19,14 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* selecting text inverts the beam, the way a terminal always highlighted:
+   phosphor becomes the background and the glyph becomes the hole */
+::selection {
+  background: color-mix(in oklab, var(--fg, #39ff7a) 85%, white);
+  color: var(--bg, #020906);
+  text-shadow: none;
+}
+
 /* ====================== CRT HOUSING ====================== */
 
 .crt {
@@ -118,6 +126,110 @@ body {
 .bezel-tag .led.on { animation: ledpulse 2.4s ease-in-out infinite; }
 @keyframes ledpulse { 50% { opacity: 0.5; } }
 
+/* ====================== HOUSING DETAILS ======================
+   Embossed, not printed: the badge is the plastic itself, so it's dark
+   type with the room's light catching its lower edge — no fill color a
+   sticker would have. */
+
+.bezel-brand {
+  position: absolute;
+  top: 11px;
+  left: 40px;
+  z-index: 5;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: #191612;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.07);
+  pointer-events: none;
+  user-select: none;
+}
+.bezel-brand .reg {
+  font-size: 7px;
+  font-weight: 400;
+  letter-spacing: 0;
+  margin-left: 1px;
+}
+.bezel-brand em {
+  font-style: normal;
+  font-weight: 400;
+  font-size: 8px;
+  letter-spacing: 0.22em;
+  color: #4a423a;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+}
+
+/* exhaust slots over the flyback — the corner that always ran hot */
+.vents {
+  position: absolute;
+  top: 12px;
+  right: 52px;
+  width: 148px;
+  height: 12px;
+  pointer-events: none;
+  z-index: 5;
+  background:
+    repeating-linear-gradient(90deg,
+      rgba(0, 0, 0, 0.5) 0 3px,
+      rgba(255, 255, 255, 0.025) 3px 3.5px,
+      transparent 3.5px 9px);
+  border-radius: 2px;
+}
+
+/* the ratings sticker every appliance carries, slightly crooked because
+   they always are */
+.serial {
+  position: absolute;
+  bottom: 14px;
+  right: 36px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 3px 6px 3px;
+  background: linear-gradient(180deg, #a8a294 0%, #948d7d 100%);
+  border-radius: 1px;
+  transform: rotate(-0.9deg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.65), inset 0 0 4px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+  user-select: none;
+  opacity: 0.9;
+}
+.serial .bars {
+  display: block;
+  height: 6px;
+  background: repeating-linear-gradient(90deg,
+    #1c1a16 0 1px, transparent 1px 2.6px,
+    #1c1a16 2.6px 4.2px, transparent 4.2px 5.2px,
+    #1c1a16 5.2px 5.7px, transparent 5.7px 7.4px);
+}
+.serial .no {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 6px;
+  letter-spacing: 0.06em;
+  color: #26231d;
+  white-space: nowrap;
+}
+
+/* four philips screws holding the shell together */
+.screws {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 5;
+  background-image:
+    radial-gradient(circle 4.5px at 21px 21px,           #0d0b09 0 1.6px, #3a352d 2.2px, #15120f 3.1px, #000 3.8px, transparent 4.5px),
+    radial-gradient(circle 4.5px at calc(100% - 21px) 21px, #0d0b09 0 1.6px, #38332b 2.2px, #14110e 3.1px, #000 3.8px, transparent 4.5px),
+    radial-gradient(circle 4.5px at 21px calc(100% - 21px), #0c0a08 0 1.6px, #322d26 2.2px, #13100d 3.1px, #000 3.8px, transparent 4.5px),
+    radial-gradient(circle 4.5px at calc(100% - 21px) calc(100% - 21px), #0c0a08 0 1.6px, #342f27 2.2px, #13100d 3.1px, #000 3.8px, transparent 4.5px);
+}
+
 /* ====================== SCREEN & CRT FX ====================== */
 
 .screen {
@@ -129,6 +241,8 @@ body {
   box-shadow:
     inset 0 0 80px rgba(0,0,0,0.95),
     inset 0 0 200px rgba(0,0,0,0.5),
+    /* the picture's own light scattering inside the glass */
+    inset 0 0 140px color-mix(in oklab, var(--glow) 4%, transparent),
     /* phosphor lighting the plastic it's set into — falls off fast,
        or the whole bezel turns green instead of looking lit */
     0 0 18px 0 color-mix(in oklab, var(--glow) 12%, transparent),
@@ -535,7 +649,197 @@ body {
     linear-gradient(270deg, rgba(214, 234, 255, 0.1) 0, transparent 1.4%);
 }
 
+/* The glass has thickness: the inner face throws a second, dimmer edge a
+   few pixels inside the rim. One hairline and a soft dark falloff — any
+   more and it reads as a border, not as refraction. */
+.rim::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 0 1px rgba(212, 232, 255, 0.02),
+    inset 0 -2px 8px rgba(0, 0, 0, 0.3);
+}
+
 .crt.powered-off .rim { opacity: calc(var(--reflection, 0.7) * 0.5); }
+
+/* ====================== NEAR GLARE ======================
+   A lamp much closer than the room: same head-tracking variables as the
+   reflection layer, but multiplied harder. Two layers sliding at
+   different rates against a fixed picture is binocular-grade depth from
+   one pointer. */
+
+.glare {
+  position: absolute;
+  inset: -18%;
+  z-index: 13;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: calc(var(--reflection, 0.7) * 0.9);
+  transform: translate3d(calc(var(--vx, 0) * 5.2%), calc(var(--vy, 0) * 7.4%), 0);
+  will-change: transform;
+  background:
+    radial-gradient(ellipse 20% 15% at 63% 21%, rgba(226, 241, 255, 0.028), transparent 70%),
+    radial-gradient(ellipse 8% 6% at 60% 18%, rgba(238, 248, 255, 0.05), transparent 68%);
+  filter: blur(2px);
+}
+.crt.powered-off .glare { opacity: calc(var(--reflection, 0.7) * 0.4); }
+
+/* ====================== TZM-PAINT ======================
+   The studio owns the raster like the saver does. The toolbar borrows
+   the f-key strip's inverse-video idiom — this is the same OS, not a
+   different program's chrome. */
+
+.paint {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  text-shadow: var(--text-shadow);
+  animation: saver-in 300ms ease-out;
+}
+
+.paint-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 1px;
+  padding: 0;
+  border-bottom: 1px solid color-mix(in oklab, var(--fg) 22%, transparent);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  user-select: none;
+  flex-wrap: wrap;
+}
+.paint-title {
+  padding: 5px 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+.paint-spacer { flex: 1; }
+
+.pbtn {
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--fg);
+  padding: 5px 10px;
+  cursor: pointer;
+  text-shadow: var(--text-shadow);
+  transition: background 80ms linear;
+}
+.pbtn:hover { background: color-mix(in oklab, var(--fg) 14%, transparent); }
+.pbtn.on {
+  background: color-mix(in oklab, var(--fg) 82%, var(--bg));
+  color: var(--bg);
+  text-shadow: none;
+}
+.pbtn.warn { opacity: 0.75; }
+.pbtn:focus-visible { outline: 1px solid var(--fg); outline-offset: -1px; }
+
+.paint-canvas {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1;
+  white-space: pre;
+  overflow: hidden;
+  cursor: crosshair;
+  touch-action: none;
+  color: var(--fg);
+}
+
+.paint-foot {
+  padding: 4px 10px 5px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.4;
+  border-top: 1px solid color-mix(in oklab, var(--fg) 14%, transparent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 600px) {
+  .paint-bar { font-size: 10px; }
+  .pbtn, .paint-title { padding: 7px 7px; }
+  .paint-canvas { font-size: 12px; }
+}
+
+/* ====================== THE WHISPER ======================
+   Text on a monitor that is switched off. It sits below the scanline and
+   glass layers so the tube still treats it as a picture — the one thing
+   the powered-off state doesn't get to suppress. */
+
+.whisper {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  padding: 15% 8% 0;
+  pointer-events: none;
+  color: var(--fg);
+  text-shadow: var(--text-shadow);
+  font-family: var(--font-body);
+  font-size: var(--font-size);
+}
+.whisper-line { min-height: 1.4em; }
+.whisper-trace {
+  margin-top: 1.2em;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  opacity: 0.72;
+}
+.whisper-rabbit {
+  position: absolute;
+  bottom: 18%;
+  font-size: 1.05em;
+  animation: rabbit-hop 0.36s ease-in-out infinite;
+  white-space: pre;
+}
+@keyframes rabbit-hop {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-0.55em); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .whisper-rabbit { animation: none; }
+}
+
+/* ====================== DUST MOTES ======================
+   Dust in the air in front of the glass, lit by the picture. Slow, tiny,
+   and almost invisible — the point is that you only catch them when you
+   aren't looking for them. */
+
+.motes {
+  position: absolute;
+  inset: 0;
+  z-index: 16;
+  pointer-events: none;
+}
+.motes span {
+  position: absolute;
+  border-radius: 50%;
+  background: #fff;
+  opacity: var(--mo, 0.1);
+  filter: blur(0.4px);
+  animation-name: mote-drift;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+@keyframes mote-drift {
+  0%   { transform: translate3d(0, 0, 0); }
+  50%  { opacity: calc(var(--mo, 0.1) * 1.8); }
+  100% { transform: translate3d(var(--mdx, 10px), var(--mdy, -14px), 0); }
+}
 
 /* nothing to reflect off a tube that's been switched off */
 .crt.powered-off .reflection { opacity: calc(var(--reflection, 0.7) * 0.45); }
@@ -803,6 +1107,25 @@ body {
   padding: 4px 0;
   margin-left: 0;
   line-height: 1.45;
+}
+
+/* the single signpost line under the opening neofetch */
+.first-hint {
+  opacity: 0.42;
+  font-size: 0.85em;
+}
+.first-hint .hi { font-weight: 700; }
+
+/* New output strikes the phosphor hot and settles, instead of just being
+   there. Runs once on mount, so scrollback that's already on the glass
+   never re-flashes. */
+.terminal .out,
+.terminal .line {
+  animation: paint-in 150ms ease-out;
+}
+@keyframes paint-in {
+  0%   { opacity: 0.15; filter: brightness(2.6); }
+  100% { opacity: 1;    filter: brightness(1); }
 }
 .out.grid2 {
   display: grid;
@@ -1141,19 +1464,6 @@ body {
   box-shadow: 0 0 5px color-mix(in oklab, var(--glow) 30%, transparent);
 }
 
-/* ====================== MATRIX & CATS ====================== */
-
-/* the canvas reads --fg/--bg back out of here, so it follows the phosphor */
-.matrix {
-  display: block;
-  width: 100%;
-  height: 300px;
-  color: var(--fg);
-  background: var(--bg);
-  margin: 6px 0;
-  border: 1px solid color-mix(in oklab, var(--fg) 22%, transparent);
-}
-
 /* ====================== PROCEDURAL DEMO ====================== */
 
 .demo {
@@ -1183,6 +1493,58 @@ body {
   pointer-events: none;
 }
 
+/* ====================== SCREENSAVER ======================
+   Owns the whole raster (statusbar and prompt included — that's the
+   point, those are the pixels being saved). Lives inside .raster so the
+   glass, scanlines and curvature stay in front of it. */
+
+.screensaver {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  background: var(--bg);
+  overflow: hidden;
+  animation: saver-in 500ms ease-out;
+  text-shadow: var(--text-shadow);
+}
+@keyframes saver-in {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+.screensaver .demo.demo-fill {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  border: 0;
+}
+.demo-fill .demo-out {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.screensaver .demo-tag { top: 10px; right: 14px; }
+
+.saver-hint {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0;
+  pointer-events: none;
+  /* fade in late and pulse: a saver announces itself, then gets out of
+     the way of the effect */
+  animation: saver-hint 6s ease-in-out 1.2s infinite;
+}
+@keyframes saver-hint {
+  0%, 100% { opacity: 0.12; }
+  50%      { opacity: 0.4; }
+}
+
 .catart {
   font-family: 'JetBrains Mono', 'IBM Plex Mono', monospace;
   font-size: 14px;
@@ -1194,8 +1556,11 @@ body {
 
 .line.live { align-items: center; }
 .cmd-input {
-  flex: 1;
-  min-width: 100px;
+  /* width rides the text (set inline, in ch) so the block cursor blinks
+     where the next glyph will land; the line stays the click target */
+  flex: 0 1 auto;
+  max-width: 100%;
+  min-width: 12px;
   background: transparent;
   border: none;
   outline: none;
@@ -1220,6 +1585,8 @@ body {
 @media (max-width: 900px) {
   .crt { padding: 6px; }
   .bezel { padding: 10px 10px 36px; border-radius: 20px; }
+  /* the thin mobile bezel has no plastic left to emboss or screw into */
+  .bezel-brand, .screws, .vents, .serial { display: none; }
   .bezel::after { top: 6px; left: 6px; right: 6px; bottom: 32px; border-radius: 14px; }
   .statusbar { font-size: 9px; gap: 10px; padding: 8px 10px; }
   .terminal { padding: 12px 12px 60px; font-size: 17px; }
@@ -1311,9 +1678,15 @@ body {
   .crt.degaussing .raster,
   .crt.degaussing .degauss-fx,
   .crt.warming .dot,
-  .crt.collapsing .dot {
+  .crt.collapsing .dot,
+  .terminal .out,
+  .terminal .line,
+  .saver-hint,
+  .motes span {
     animation: none !important;
   }
+  .saver-hint { opacity: 0.3; }
+  .motes { display: none; }
   /* the tube still has to switch, just without the wobble and the punch */
   .crt.collapsing .raster {
     animation: none !important;

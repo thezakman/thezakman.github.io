@@ -18,7 +18,7 @@ const SOCIALS = [
   { glyph: '▶', name: 'steam',      handle: 'thezakman87',    url: 'http://steamcommunity.com/id/thezakman87',                 kb: '888K', mtime: 'Dec 24  2022' },
 ];
 
-const CMDS = ['about', 'social', 'donate', 'contact', 'neofetch', 'matrix', 'demo', 'date', 'clear'];
+const CMDS = ['about', 'social', 'donate', 'contact', 'neofetch', 'paint', 'demo', 'date', 'clear'];
 
 /* The function-key strip every DOS-era file manager ended with. The digit
    is real: F1-F9 fire it, and so does Alt+digit, since macOS eats bare
@@ -35,8 +35,10 @@ const HELP = [
   ['donate',     'buy me a beer'],
   ['contact',    'how to reach me'],
   ['neofetch',   'system summary'],
-  ['matrix',     'you already know'],
-  ['demo',       'a random procedural effect'],
+  ['paint',      'ascii studio — burn your own art'],
+  ['demo',       "a procedural effect — 'demo list'"],
+  ['screensaver','after dark, hold the toasters'],
+  ['phosphor',   'swap the tube: phosphor amber'],
   ['date',       'the clock on my desk'],
   ['degauss',    'fire the coil'],
   ['sound',      'let the flyback sing'],
@@ -47,8 +49,10 @@ const HELP = [
 /* Everything tab-completable, including what the button bar doesn't show. */
 const COMPLETIONS = [
   'about', 'beer', 'cats', 'clear', 'contact', 'date', 'degauss', 'demo',
-  'donate', 'exit', 'fx', 'hardware', 'help', 'irc', 'ls', 'ls -la', 'matrix',
-  'mute', 'neofetch', 'poweroff', 'shutdown', 'social', 'sound', 'specs',
+  'demo list', 'donate', 'exit', 'fx', 'hardware', 'help', 'irc', 'ls', 'ls -la', 'matrix',
+  'mute', 'neofetch', 'paint', 'phosphor', 'phosphor amber', 'phosphor cyan',
+  'phosphor green', 'phosphor magenta', 'phosphor white', 'poweroff',
+  'saver', 'screensaver', 'shutdown', 'social', 'sound', 'specs',
   'unmute', 'whoami',
 ];
 
@@ -412,7 +416,23 @@ function useCrtSound(enabled, volume) {
     sweep.start(t + 0.05); sweep.stop(t + 0.8);
   }, []);
 
-  return { setPowered, degaussSound, powerOffSound, powerOnSound };
+  /* somebody else's keystroke, heard through a monitor that is off */
+  const keyTick = useCallback(() => {
+    const a = rig.current;
+    if (!a) return;
+    const { ctx, master } = a;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'square';
+    o.frequency.value = 1300 + Math.random() * 700;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.016, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.015);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + 0.02);
+  }, []);
+
+  return { setPowered, degaussSound, powerOffSound, powerOnSound, keyTick };
 }
 
 /* ==================== type-on hook ==================== */
@@ -606,144 +626,6 @@ function StatusBar({ bootStart, phosphor }) {
   );
 }
 
-/* ==================== matrix rain ==================== */
-
-/* Every column runs its own speed, trail length and reset odds — a single
-   shared cadence is what made the old one read as a screensaver. The head
-   glyph burns near-white and the trail decays behind it, glyphs mutate in
-   place, and the whole thing takes its colour from the live phosphor. */
-const GLYPHS = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホミムメモヤユヨラリルレロワヲン0123456789THEZAKMAN:."=*+-<>¦'.split('');
-
-function MatrixRain() {
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const canvas = ref.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d', { alpha: false });
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const CELL = 14, FONT = 15;
-    let w = 0, h = 0, cols = [];
-
-    const phosphor = getComputedStyle(canvas);
-    const fg = phosphor.color;
-    const bg = phosphor.backgroundColor;
-
-    const rgb = fg.match(/[\d.]+/g).map(Number);
-    const shade = (a) => `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`;
-    /* the leading glyph is hotter than the phosphor can render — that's
-       what makes it read as a strike rather than a bright letter */
-    const head = `rgb(${Math.min(255, rgb[0] + 150)}, ${Math.min(255, rgb[1] + 90)}, ${Math.min(255, rgb[2] + 150)})`;
-
-    const layout = () => {
-      w = canvas.clientWidth;
-      h = canvas.clientHeight;
-      canvas.width = w * dpr;
-      canvas.height = h * dpr;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.fillStyle = bg;
-      ctx.fillRect(0, 0, w, h);
-      const n = Math.ceil(w / CELL);
-      cols = Array.from({ length: n }, () => ({
-        y: Math.random() * -40,
-        speed: 0.35 + Math.random() * 0.85,
-        len: 8 + Math.floor(Math.random() * 22),
-        chars: [],
-      }));
-    };
-    layout();
-
-    let raf = 0, last = 0, running = true, repaint = null;
-    /* rain that won't stop is exactly what reduced-motion is asking about:
-       run it far enough that the columns have real trails, then freeze */
-    const still = prefersReducedMotion();
-
-    /* layout() wipes the canvas, so a frozen frame would be resized to blank
-       and never come back — re-run the pre-roll instead */
-    const ro = new ResizeObserver(() => { layout(); if (repaint) repaint(); });
-    ro.observe(canvas);
-
-    const draw = (now) => {
-      if (!running) return;
-      const dt = Math.min(50, now - (last || now));
-      last = now;
-
-      /* fade rather than clear: the trails are phosphor decay */
-      ctx.fillStyle = bg.replace(/rgba?\(([^)]+)\)/, (m, p) => {
-        const c = p.split(',').map(s => parseFloat(s));
-        return `rgba(${c[0]}, ${c[1]}, ${c[2]}, 0.10)`;
-      });
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.fillRect(0, 0, w, h);
-      ctx.font = `${FONT}px VT323, monospace`;
-      ctx.textBaseline = 'top';
-
-      const step = dt / 16.67;
-      for (let i = 0; i < cols.length; i++) {
-        const c = cols[i];
-        const prev = Math.floor(c.y);
-        c.y += c.speed * step;
-        const row = Math.floor(c.y);
-
-        if (row !== prev) {
-          c.chars.unshift(GLYPHS[(Math.random() * GLYPHS.length) | 0]);
-          if (c.chars.length > c.len) c.chars.length = c.len;
-        }
-        /* a glyph already on screen sometimes flips to another */
-        if (c.chars.length && Math.random() < 0.06) {
-          c.chars[(Math.random() * c.chars.length) | 0] = GLYPHS[(Math.random() * GLYPHS.length) | 0];
-        }
-
-        for (let j = 0; j < c.chars.length; j++) {
-          const y = (row - j) * CELL;
-          if (y < -CELL || y > h) continue;
-          if (j === 0) {
-            ctx.fillStyle = head;
-            ctx.shadowColor = fg;
-            ctx.shadowBlur = 8;
-          } else {
-            ctx.fillStyle = shade(Math.max(0, 1 - j / c.len) * 0.85);
-            ctx.shadowBlur = 0;
-          }
-          ctx.fillText(c.chars[j], i * CELL, y);
-        }
-        ctx.shadowBlur = 0;
-
-        if ((row - c.chars.length) * CELL > h && Math.random() < 0.03) {
-          c.y = -Math.random() * 20;
-          c.speed = 0.35 + Math.random() * 0.85;
-          c.len = 8 + Math.floor(Math.random() * 22);
-          c.chars = [];
-        }
-      }
-      if (still) { running = false; raf = 0; return; }
-      raf = requestAnimationFrame(draw);
-    };
-
-    if (still) {
-      repaint = () => {
-        let clock = 0;
-        for (let i = 0; i < 120; i++) { running = true; last = clock; draw(clock += 33); }
-        running = false;
-      };
-      repaint();
-      return () => { ro.disconnect(); };
-    }
-
-    /* scroll it out of the tube and it stops costing frames */
-    const io = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting && !raf) { running = true; last = 0; raf = requestAnimationFrame(draw); }
-      else if (!e.isIntersecting && raf) { running = false; cancelAnimationFrame(raf); raf = 0; }
-    }, { threshold: 0.01 });
-    io.observe(canvas);
-
-    return () => { running = false; cancelAnimationFrame(raf); io.disconnect(); ro.disconnect(); };
-  }, []);
-
-  return <canvas className="matrix" ref={ref} aria-label="matrix rain" />;
-}
-
 /* ==================== procedural demos ====================
    Drawn as text rather than to a canvas, so every effect inherits the
    phosphor glow, the scanlines and the tube's curvature instead of sitting
@@ -805,11 +687,14 @@ function fireDemo(W, H) {
   const h = H + 1;
   const buf = new Float32Array(W * h);
   const density = rnd(0.72, 0.95), cool = rnd(0.075, 0.15), spread = rnd(0.6, 1);
+  /* a draught: some sessions the flames lean, and how hard is a roll too */
+  const wind = rnd(-0.35, 0.35);
   return () => {
     for (let i = 0; i < W; i++) buf[(h - 1) * W + i] = Math.random() < density ? 1 : 0.35;
     for (let j = 0; j < h - 1; j++) {
       for (let i = 0; i < W; i++) {
-        const drift = Math.random() < spread ? ((Math.random() * 3) | 0) - 1 : 0;
+        const drift = (Math.random() < spread ? ((Math.random() * 3) | 0) - 1 : 0)
+                    + (Math.random() < Math.abs(wind) ? Math.sign(wind) : 0);
         const si = Math.min(W - 1, Math.max(0, i + drift));
         const v = buf[(j + 1) * W + si] - Math.random() * cool;
         buf[j * W + i] = v > 0 ? v : 0;
@@ -1408,6 +1293,333 @@ function grayScottDemo(W, H) {
   };
 }
 
+/* ---- shadebobs: the Amiga effect that was really just "don't clear the
+   screen" — a blob adds light where it passes and the buffer only slowly
+   forgets. Lissajous paths, so the trails weave. ---- */
+function shadebobsDemo(W, H) {
+  const N = 2 + ((Math.random() * 3) | 0);
+  const bobs = Array.from({ length: N }, () => ({
+    fx: rnd(0.4, 1.3) * rsign(), fy: rnd(0.6, 1.7) * rsign(),
+    px: rnd(0, 6.3), py: rnd(0, 6.3),
+    r: Math.max(2, Math.round(rnd(2.2, 4.4))),
+  }));
+  const buf = new Float32Array(W * H);
+  const decay = rnd(0.94, 0.974), gain = rnd(0.1, 0.2);
+  return (t) => {
+    for (let i = 0; i < buf.length; i++) buf[i] *= decay;
+    for (const b of bobs) {
+      const ry = b.r, rx = b.r * 2;   // char cells are half as wide as tall
+      const cx = W / 2 + Math.sin(t * b.fx + b.px) * (W / 2 - rx - 2);
+      const cy = H / 2 + Math.sin(t * b.fy + b.py) * (H / 2 - ry - 1);
+      for (let dy = -ry; dy <= ry; dy++) {
+        for (let dx = -rx; dx <= rx; dx++) {
+          const d = Math.hypot(dx / rx, dy / ry);
+          if (d > 1) continue;
+          const xi = Math.round(cx + dx), yi = Math.round(cy + dy);
+          if (xi < 0 || xi >= W || yi < 0 || yi >= H) continue;
+          const i = yi * W + xi;
+          buf[i] = Math.min(1.5, buf[i] + gain * (1 - d));
+        }
+      }
+    }
+    let s = '';
+    for (let j = 0; j < H; j++) {
+      for (let i = 0; i < W; i++) s += shade(Math.min(1, buf[j * W + i]));
+      s += '\n';
+    }
+    return s;
+  };
+}
+
+/* ---- vector balls: a fibonacci sphere of dots, spun on two axes and
+   breathing. Depth does the shading, the way the ball-sprite demos faked
+   it with pre-shaded bobs. ---- */
+function dotSphereDemo(W, H) {
+  const N = 110 + ((Math.random() * 130) | 0);
+  const GA = Math.PI * (3 - Math.sqrt(5));
+  const pts = Array.from({ length: N }, (_, i) => {
+    const y = 1 - (i / (N - 1)) * 2;
+    const r = Math.sqrt(Math.max(0, 1 - y * y)), a = GA * i;
+    return [Math.cos(a) * r, y, Math.sin(a) * r];
+  });
+  const R = H * rnd(0.3, 0.42);
+  const sa = rnd(0.5, 1.1) * rsign(), sb = rnd(0.3, 0.8) * rsign();
+  const pa = rnd(0, 6.3), pb = rnd(0, 6.3);
+  const breathe = rnd(0.15, 0.5), br = rnd(0.05, 0.2);
+  const zbuf = new Float32Array(W * H);
+  return (t) => {
+    const grid = new Array(W * H).fill(' ');
+    zbuf.fill(1e9);
+    const A = t * sa + pa, B = t * sb + pb;
+    const cA = Math.cos(A), sA = Math.sin(A), cB = Math.cos(B), sB = Math.sin(B);
+    const R2 = R * (1 + Math.sin(t * breathe) * br);
+    for (const [px, py, pz] of pts) {
+      const x = px * cA - pz * sA;
+      let z = px * sA + pz * cA;
+      const y = py * cB - z * sB;
+      z = py * sB + z * cB;
+      const d = 2.6 / (z + 3.6);
+      const xi = Math.round(W / 2 + x * d * R2 * 2);
+      const yi = Math.round(H / 2 + y * d * R2);
+      if (xi < 0 || xi >= W || yi < 0 || yi >= H) continue;
+      const i = yi * W + xi;
+      if (z < zbuf[i]) {
+        zbuf[i] = z;
+        grid[i] = shade(0.3 + 0.7 * (0.5 - z / 2));
+      }
+    }
+    let s = '';
+    for (let j = 0; j < H; j++) { s += grid.slice(j * W, j * W + W).join(''); s += '\n'; }
+    return s;
+  };
+}
+
+/* ---- wormhole: rings of dots pulled past the camera down a pipe that
+   itself sways, so the far end wanders off-centre the way a real tunnel
+   effect's lookup table did. ---- */
+function wormholeDemo(W, H) {
+  const RINGS = 20 + ((Math.random() * 8) | 0);
+  const PER = 10 + ((Math.random() * 8) | 0);
+  const speed = rnd(0.12, 0.26), twist = rnd(0.4, 1.4) * rsign();
+  const swayX = rnd(0.4, 1.0), swayY = rnd(0.5, 1.1), swayA = rnd(0.2, 0.42);
+  const rings = Array.from({ length: RINGS }, (_, i) => ({ z: i / RINGS }));
+  return (t, dt) => {
+    const grid = new Array(W * H).fill(' ');
+    for (const r of rings) {
+      r.z -= speed * Math.min(60, dt) / 1000;
+      if (r.z <= 0.03) r.z += 1;
+    }
+    const sorted = [...rings].sort((a, b) => b.z - a.z);
+    for (const r of sorted) {
+      const z = r.z;
+      const k = 0.42 / (z + 0.1);
+      const cx = W / 2 + Math.sin(t * swayX + z * 4.6) * W * swayA * z;
+      const cy = H / 2 + Math.cos(t * swayY + z * 3.8) * H * swayA * 0.8 * z;
+      const lit = Math.min(1, (1 - z) * 1.15);
+      const ch = shade(lit * 0.9 + 0.1);
+      for (let p = 0; p < PER; p++) {
+        const a = (p / PER) * 6.283 + t * twist + z * 5;
+        const xi = Math.round(cx + Math.cos(a) * k * H * 2);
+        const yi = Math.round(cy + Math.sin(a) * k * H);
+        if (xi >= 0 && xi < W && yi >= 0 && yi < H) grid[yi * W + xi] = ch;
+      }
+    }
+    let s = '';
+    for (let j = 0; j < H; j++) { s += grid.slice(j * W, j * W + W).join(''); s += '\n'; }
+    return s;
+  };
+}
+
+/* ---- the checkerboard floor every cracktro scrolled something over.
+   Perspective is the honest 1/y kind; the sway is the camera drifting,
+   not the floor. ---- */
+function checkerFloorDemo(W, H) {
+  const horizon = rnd(0.24, 0.4);
+  const spd = rnd(1.2, 3.0) * rsign(), size = rnd(0.7, 1.4);
+  const sway = rnd(0.2, 1.1), swayS = rnd(0.25, 0.7);
+  const persp = rnd(5, 9);
+  return (t) => {
+    let s = '';
+    const hy = (H * horizon) | 0;
+    const K = H * 1.1;
+    for (let j = 0; j < H; j++) {
+      if (j <= hy) {
+        /* a thin airglow right on the horizon, then empty sky */
+        s += (j === hy ? '.'.repeat(W) : ' '.repeat(W)) + '\n';
+        continue;
+      }
+      const z = persp / (j - hy);
+      const fog = Math.max(0, 1 - z / persp);
+      const drift = Math.sin(t * swayS) * sway * z;
+      let row = '';
+      for (let i = 0; i < W; i++) {
+        const u = ((i - W / 2) * z) / K + drift;
+        const v = z / size + t * spd;
+        const check = (Math.floor(u / size) + Math.floor(v)) & 1;
+        row += shade((check ? 0.9 : 0.22) * fog);
+      }
+      s += row + '\n';
+    }
+    return s;
+  };
+}
+
+/* ---- fireworks: rockets with real ballistics. x-velocities are doubled
+   everywhere because a char cell is half as wide as it is tall — without
+   that every burst comes out as a tall ellipse. ---- */
+function fireworksDemo(W, H) {
+  const parts = [];
+  let fuse = 0.4;
+  const g = rnd(8, 13), rate = rnd(0.6, 1.4);
+  return (t, dt) => {
+    const step = Math.min(60, dt) / 1000;
+    fuse -= step;
+    if (fuse <= 0 && parts.length < 700) {
+      fuse = rnd(0.25, 1.0) / rate;
+      const apex = H * rnd(0.45, 0.8);
+      parts.push({
+        x: rnd(W * 0.15, W * 0.85), y: H + 1,
+        vx: rnd(-2.5, 2.5) * 2, vy: -Math.sqrt(2 * g * 0.35 * apex),
+        rocket: true, life: 2, decay: 0.25,
+      });
+    }
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      p.x += p.vx * step; p.y += p.vy * step;
+      p.vy += g * step * (p.rocket ? 0.35 : 1);
+      p.life -= step * p.decay;
+      if (p.rocket && p.vy >= -1.2) {
+        const n = 34 + ((Math.random() * 44) | 0);
+        const pow = rnd(5, 11);
+        for (let k = 0; k < n; k++) {
+          const a = Math.random() * 6.283, sp = pow * (0.3 + Math.random() * 0.7);
+          parts.push({
+            x: p.x, y: p.y,
+            vx: Math.cos(a) * sp * 2, vy: Math.sin(a) * sp * 0.6,
+            rocket: false, life: 1, decay: rnd(0.35, 0.8),
+          });
+        }
+        parts.splice(i, 1);
+        continue;
+      }
+      if (p.life <= 0 || p.y > H + 2) parts.splice(i, 1);
+    }
+    const grid = new Array(W * H).fill(' ');
+    for (const p of parts) {
+      const xi = Math.round(p.x), yi = Math.round(p.y);
+      if (xi < 0 || xi >= W || yi < 0 || yi >= H) continue;
+      grid[yi * W + xi] = p.rocket ? '|' : shade(Math.max(0.08, p.life));
+    }
+    let s = '';
+    for (let j = 0; j < H; j++) { s += grid.slice(j * W, j * W + W).join(''); s += '\n'; }
+    return s;
+  };
+}
+
+/* ---- tesseract: the cube's big sibling. Sixteen ±1 vertices in 4D,
+   edges wherever exactly one coordinate differs, spun through three
+   planes and projected twice — w-divide, then z-divide. ---- */
+function tesseractDemo(W, H) {
+  const V = [];
+  for (let i = 0; i < 16; i++) {
+    V.push([(i & 1) * 2 - 1, ((i >> 1) & 1) * 2 - 1, ((i >> 2) & 1) * 2 - 1, ((i >> 3) & 1) * 2 - 1]);
+  }
+  const E = [];
+  for (let i = 0; i < 16; i++) {
+    for (let b = 0; b < 4; b++) { const j = i ^ (1 << b); if (j > i) E.push([i, j]); }
+  }
+  const s1 = rnd(0.25, 0.7) * rsign(), s2 = rnd(0.35, 0.85) * rsign(), s3 = rnd(0.15, 0.5) * rsign();
+  const p1 = rnd(0, 6.3), p2 = rnd(0, 6.3), p3 = rnd(0, 6.3);
+  const scale = H * rnd(0.6, 0.85);
+  return (t) => {
+    const a = t * s1 + p1, b = t * s2 + p2, c = t * s3 + p3;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    const cb = Math.cos(b), sb = Math.sin(b);
+    const cc = Math.cos(c), sc = Math.sin(c);
+    const proj = V.map(([x, y, z, w]) => {
+      /* xw, then yz, then xy — three planes is what makes the inner cube
+         tumble instead of just spinning in place */
+      let X = x * ca - w * sa, Wc = x * sa + w * ca;
+      let Y = y * cb - z * sb, Z = y * sb + z * cb;
+      const X2 = X * cc - Y * sc, Y2 = X * sc + Y * cc;
+      const d4 = 2.0 / (2.8 - Wc);
+      const x3 = X2 * d4, y3 = Y2 * d4, z3 = Z * d4;
+      const d3 = 3.0 / (z3 + 4.2);
+      return [W / 2 + x3 * d3 * scale * 2, H / 2 + y3 * d3 * scale, (d4 * d3)];
+    });
+    const grid = new Array(W * H).fill(' ');
+    const plot = (x, y, ch) => {
+      const xi = Math.round(x), yi = Math.round(y);
+      if (xi >= 0 && xi < W && yi >= 0 && yi < H) grid[yi * W + xi] = ch;
+    };
+    for (const [i, j] of E) {
+      const [x0, y0, w0] = proj[i], [x1, y1, w1] = proj[j];
+      const ch = shade(Math.min(1, (w0 + w1) * 0.42));
+      const steps = Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0) * 2)) || 1;
+      const dx = (x1 - x0) / steps, dy = (y1 - y0) / steps;
+      for (let s = 0; s <= steps; s++) plot(x0 + dx * s, y0 + dy * s, ch);
+    }
+    let s = '';
+    for (let j = 0; j < H; j++) { s += grid.slice(j * W, j * W + W).join(''); s += '\n'; }
+    return s;
+  };
+}
+
+/* ---- digital rain. The old canvas version rained katakana; a <pre>
+   grid can't — full-width glyphs are wider than a cell and shear the
+   whole column grid — so this one rains what the tube actually owns,
+   and glyphs decay through punctuation as they age instead of fading. ---- */
+function matrixDemo(W, H) {
+  const FRESH = 'TZAKMN0123456789XKRWBQ$#@%&';
+  const MID = '=+*:;!?7412';
+  const OLD = '.,:\'';
+  const cols = Array.from({ length: W }, () => ({
+    y: -Math.random() * H * 2,
+    speed: rnd(0.25, 1.05),
+    len: 5 + ((Math.random() * 16) | 0),
+    chars: [],
+  }));
+  return (t, dt) => {
+    const grid = new Array(W * H).fill(' ');
+    const step = Math.min(60, dt) / 16.7;
+    for (let i = 0; i < W; i++) {
+      const c = cols[i];
+      const prev = Math.floor(c.y);
+      c.y += c.speed * step;
+      const row = Math.floor(c.y);
+      if (row !== prev) {
+        c.chars.unshift(FRESH[(Math.random() * FRESH.length) | 0]);
+        if (c.chars.length > c.len) c.chars.length = c.len;
+      }
+      if (c.chars.length && Math.random() < 0.05) {
+        c.chars[(Math.random() * c.chars.length) | 0] = FRESH[(Math.random() * FRESH.length) | 0];
+      }
+      for (let k = 0; k < c.chars.length; k++) {
+        const y = row - k;
+        if (y < 0 || y >= H) continue;
+        const age = k / c.len;
+        let ch = c.chars[k];
+        if (age > 0.75) ch = OLD[(y * 7 + i) % OLD.length];
+        else if (age > 0.45) ch = MID[(y * 5 + i * 3) % MID.length];
+        grid[y * W + i] = ch;
+      }
+      if (row - c.chars.length > H && Math.random() < 0.04) {
+        c.y = -Math.random() * 14;
+        c.speed = rnd(0.25, 1.05);
+        c.len = 5 + ((Math.random() * 16) | 0);
+        c.chars = [];
+      }
+    }
+    let s = '';
+    for (let j = 0; j < H; j++) { s += grid.slice(j * W, j * W + W).join(''); s += '\n'; }
+    return s;
+  };
+}
+
+/* ---- the dead channel: snow, a hum bar crawling through, and the odd
+   frame tear. The one effect that isn't computed so much as permitted. ---- */
+function staticDemo(W, H) {
+  const barSpd = rnd(2, 6) * rsign(), barW = rnd(2.5, 6);
+  const grain = rnd(0.35, 0.7);
+  const range = H + barW * 2;
+  return (t) => {
+    let s = '';
+    const barY = ((((t * barSpd) % range) + range) % range) - barW;
+    for (let j = 0; j < H; j++) {
+      const lift = Math.max(0, 1 - Math.abs(j - barY) / barW) * 0.4;
+      /* a tear shears the whole row sideways for a frame */
+      const tear = Math.random() < 0.012 ? ((Math.random() * 7) | 0) - 3 : 0;
+      let row = '';
+      for (let i = 0; i < W; i++) {
+        const v = Math.random() * grain + lift;
+        row += shade(Math.random() < 0.03 ? Math.min(1, v * 2.2) : v);
+      }
+      s += (tear ? row.slice(-tear) + row.slice(0, -tear) : row) + '\n';
+    }
+    return s;
+  };
+}
+
 const DEMOS = [
   /* --- fields --- */
   { name: 'plasma', make: field(() => {
@@ -1547,6 +1759,14 @@ const DEMOS = [
 
   /* --- everything that needs to remember something --- */
   { name: 'fire',       make: fireDemo },
+  { name: 'shadebobs',  make: shadebobsDemo },
+  { name: 'vector balls', make: dotSphereDemo },
+  { name: 'wormhole',   make: wormholeDemo },
+  { name: 'checkerfloor', make: checkerFloorDemo },
+  { name: 'fireworks',  make: fireworksDemo },
+  { name: 'tesseract',  make: tesseractDemo },
+  { name: 'static',     make: staticDemo },
+  { name: 'matrix',     make: matrixDemo },
   { name: 'donut',      make: donutDemo },
   { name: 'rotozoom',   make: rotozoomDemo },
   { name: 'scroller',   make: scrollerDemo },
@@ -1569,17 +1789,19 @@ const DEMOS = [
 
 const DEMO_ROWS = 26;
 
-function DemoFX() {
+function DemoFX({ fill, name }) {
   const ref = useRef(null);
   const pick = useRef(null);
-  if (!pick.current) pick.current = DEMOS[(Math.random() * DEMOS.length) | 0];
+  if (!pick.current) {
+    pick.current = (name && DEMOS.find(d => d.name === name))
+      || DEMOS[(Math.random() * DEMOS.length) | 0];
+  }
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     const { make } = pick.current;
-    const H = DEMO_ROWS;
-    let W = 0, draw = null;
+    let W = 0, H = 0, draw = null;
 
     /* Measure the advance with an absolutely-positioned inline span that
        inherits the <pre>'s font. It has to be inline — a block's scrollWidth
@@ -1594,9 +1816,16 @@ function DemoFX() {
       span.remove();
       if (cw <= 0.5) return;
       const next = Math.max(24, Math.min(240, Math.floor(el.clientWidth / cw)));
+      /* In fill mode the effect owns the whole raster, so the row count
+         comes from the box instead of DEMO_ROWS — clamped, because the
+         stateful demos cost W*H per frame. */
+      const rowH = parseFloat(getComputedStyle(el).fontSize) || 13;
+      const nextH = fill
+        ? Math.max(16, Math.min(80, Math.floor(el.clientHeight / rowH)))
+        : DEMO_ROWS;
       /* the effects size their buffers to W, so a resize has to rebuild
          them — and that necessarily restarts anything stateful */
-      if (next !== W) { W = next; draw = make(W, H); }
+      if (next !== W || nextH !== H) { W = next; H = nextH; draw = make(W, H); }
     };
     measure();
     /* VT323 may still be in flight on first paint, and the fallback is a
@@ -1639,9 +1868,449 @@ function DemoFX() {
   }, []);
 
   return (
-    <div className="demo">
+    <div className={`demo ${fill ? 'demo-fill' : ''}`}>
       <pre className="demo-out" ref={ref} aria-hidden="true" />
       <span className="demo-tag dim">{pick.current.name}</span>
+    </div>
+  );
+}
+
+/* ==================== screensaver ====================
+   After Dark, minus the toasters: leave the tube alone long enough and a
+   random demo takes the whole raster — which is also what the burn-in
+   layer pretends this machine never had. Any input hands the phosphor
+   back. Rotates to a fresh effect on a timer, the way a saver that ran
+   all night would. */
+
+const SAVER_ROTATE_MS = 45000;
+
+function Screensaver({ onWake }) {
+  const [gen, setGen] = useState(0);
+
+  useEffect(() => {
+    if (prefersReducedMotion()) return;
+    const id = setInterval(() => setGen(g => g + 1), SAVER_ROTATE_MS);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    /* capture + stopPropagation: the keystroke that wakes the saver must
+       not also type into the prompt or fire an F-key binding */
+    const wakeKey = (e) => { e.preventDefault(); e.stopPropagation(); onWake(); };
+    const wake = () => onWake();
+    window.addEventListener('keydown', wakeKey, true);
+    window.addEventListener('pointerdown', wake, true);
+    window.addEventListener('pointermove', wake, true);
+    window.addEventListener('touchstart', wake, true);
+    return () => {
+      window.removeEventListener('keydown', wakeKey, true);
+      window.removeEventListener('pointerdown', wake, true);
+      window.removeEventListener('pointermove', wake, true);
+      window.removeEventListener('touchstart', wake, true);
+    };
+  }, [onWake]);
+
+  return (
+    <div className="screensaver">
+      <DemoFX key={gen} fill />
+      <div className="saver-hint">any key wakes the tube</div>
+    </div>
+  );
+}
+
+/* ==================== tzm-paint ====================
+   An ASCII studio living inside the tube. Not a toy version of a paint
+   program — a paint program whose medium is the phosphor itself: the
+   airbrush lays down beam intensity, the pen writes glyphs, and the fire
+   brush paints fuel that keeps burning for as long as you watch it.
+   Mirror modes because half of demoscene logos were made that way.
+
+   The art survives closing the app (kept per session, same tube size),
+   and `copy` puts the raw text on the clipboard — it's ASCII, take it. */
+
+const PAINT_KEEP = { W: 0, H: 0, ink: null, chars: null, fuel: null };
+const PEN_CHARS = ['#', '@', '%', '*', '+', '=', '·', '"', '.'];
+const GLITCH_CHARS = '!<>-_\\/[]{}=+*^?#$%&@:;'.split('');
+const PAINT_TOOLS = ['air', 'pen', 'fire', 'glitch', 'erase'];
+const MIRRORS = ['off', 'x', 'y', 'xy'];
+
+function PaintStudio({ onExit }) {
+  const preRef = useRef(null);
+  const [tool, setTool] = useState('air');
+  const [mirror, setMirror] = useState('off');
+  const [penIdx, setPenIdx] = useState(0);
+  const [msg, setMsg] = useState('');
+  /* refs so the pointer handlers and rAF loop never go stale */
+  const toolRef = useRef(tool); toolRef.current = tool;
+  const mirrorRef = useRef(mirror); mirrorRef.current = mirror;
+  const penRef = useRef(penIdx); penRef.current = penIdx;
+  const drawing = useRef(false);
+  const lastCell = useRef(null);
+  const msgTimer = useRef(0);
+  const S = useRef({ W: 0, H: 0, ink: null, chars: null, fuel: null, heat: null, cw: 8, rh: 20 }).current;
+
+  useEffect(() => {
+    const el = preRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      const span = document.createElement('span');
+      span.textContent = 'M'.repeat(50);
+      span.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;';
+      el.appendChild(span);
+      const r = span.getBoundingClientRect();
+      const cw = r.width / 50, rh = r.height || 20;
+      span.remove();
+      if (cw <= 0.5) return;
+      const W = Math.max(24, Math.min(260, Math.floor(el.clientWidth / cw)));
+      const H = Math.max(12, Math.min(90, Math.floor(el.clientHeight / rh)));
+      S.cw = cw; S.rh = rh;
+      if (W === S.W && H === S.H) return;
+      S.W = W; S.H = H;
+      if (PAINT_KEEP.W === W && PAINT_KEEP.H === H && PAINT_KEEP.ink) {
+        /* same tube, same canvas — the session's art comes back */
+        S.ink = PAINT_KEEP.ink; S.chars = PAINT_KEEP.chars; S.fuel = PAINT_KEEP.fuel;
+      } else {
+        S.ink = new Float32Array(W * H);
+        S.fuel = new Uint8Array(W * H);
+        S.chars = new Array(W * H).fill('');
+      }
+      S.heat = new Float32Array(W * (H + 1));
+    };
+    measure();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+
+    let raf = 0, running = true, last = 0;
+    const frame = (now) => {
+      if (!running) return;
+      raf = requestAnimationFrame(frame);
+      if (now - last < 33) return;
+      last = now;
+      const { W, H, ink, chars, fuel, heat } = S;
+      if (!W) return;
+      /* the fire pass: fuel burns at full heat, flame climbs off it with
+         sideways drift and cooling — same physics as the fire demo */
+      for (let j = H - 1; j >= 0; j--) {
+        for (let i = 0; i < W; i++) {
+          const idx = j * W + i;
+          if (fuel[idx]) { heat[idx] = 1; continue; }
+          const drift = ((Math.random() * 3) | 0) - 1;
+          const si = Math.min(W - 1, Math.max(0, i + drift));
+          const v = heat[(j + 1) * W + si] - (0.14 + Math.random() * 0.12);
+          heat[idx] = v > 0 ? v : 0;
+        }
+      }
+      let s = '';
+      for (let j = 0; j < H; j++) {
+        for (let i = 0; i < W; i++) {
+          const idx = j * W + i;
+          const glow = ink[idx] > heat[idx] ? ink[idx] : heat[idx];
+          s += chars[idx] || (glow > 0 ? shade(Math.min(1, glow)) : ' ');
+        }
+        s += '\n';
+      }
+      el.textContent = s;
+    };
+    raf = requestAnimationFrame(frame);
+
+    return () => {
+      running = false;
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      PAINT_KEEP.W = S.W; PAINT_KEEP.H = S.H;
+      PAINT_KEEP.ink = S.ink; PAINT_KEEP.chars = S.chars; PAINT_KEEP.fuel = S.fuel;
+    };
+  }, []);
+
+  /* esc leaves the studio — captured so it can't reach the shell */
+  useEffect(() => {
+    const k = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onExit(); }
+    };
+    window.addEventListener('keydown', k, true);
+    return () => window.removeEventListener('keydown', k, true);
+  }, [onExit]);
+
+  const stampAt = useCallback((cx, cy) => {
+    const { W, H, ink, chars, fuel } = S;
+    if (!W || cx < 0 || cx >= W || cy < 0 || cy >= H) return;
+    const t = toolRef.current, m = mirrorRef.current;
+    const spots = [[cx, cy]];
+    if (m === 'x' || m === 'xy') spots.push([W - 1 - cx, cy]);
+    if (m === 'y' || m === 'xy') spots.push([cx, H - 1 - cy]);
+    if (m === 'xy') spots.push([W - 1 - cx, H - 1 - cy]);
+    for (const [x, y] of spots) {
+      if (t === 'pen') {
+        const idx = y * W + x;
+        if (idx >= 0 && idx < W * H) chars[idx] = PEN_CHARS[penRef.current];
+      } else if (t === 'air') {
+        const R = 3;
+        for (let dy = -R; dy <= R; dy++) {
+          for (let dx = -R * 2; dx <= R * 2; dx++) {
+            const xi = x + dx, yi = y + dy;
+            if (xi < 0 || xi >= W || yi < 0 || yi >= H) continue;
+            const d = Math.hypot(dx / (R * 2), dy / R);
+            if (d > 1) continue;
+            const idx = yi * W + xi;
+            ink[idx] = Math.min(1.15, ink[idx] + 0.16 * (1 - d) * (1 - d));
+          }
+        }
+      } else if (t === 'fire') {
+        for (let dy = 0; dy <= 1; dy++) {
+          for (let dx = -2; dx <= 2; dx++) {
+            const xi = x + dx, yi = y + dy;
+            if (xi >= 0 && xi < W && yi >= 0 && yi < H) fuel[yi * W + xi] = 1;
+          }
+        }
+      } else if (t === 'glitch') {
+        for (let k = 0; k < 5; k++) {
+          const xi = x + ((Math.random() * 9) | 0) - 4;
+          const yi = y + ((Math.random() * 5) | 0) - 2;
+          if (xi >= 0 && xi < W && yi >= 0 && yi < H) {
+            chars[yi * W + xi] = GLITCH_CHARS[(Math.random() * GLITCH_CHARS.length) | 0];
+          }
+        }
+      } else if (t === 'erase') {
+        const R = 3;
+        for (let dy = -R; dy <= R; dy++) {
+          for (let dx = -R * 2; dx <= R * 2; dx++) {
+            const xi = x + dx, yi = y + dy;
+            if (xi < 0 || xi >= W || yi < 0 || yi >= H) continue;
+            if (Math.hypot(dx / (R * 2), dy / R) > 1) continue;
+            const idx = yi * W + xi;
+            ink[idx] = 0; fuel[idx] = 0; chars[idx] = '';
+          }
+        }
+      }
+    }
+  }, []);
+
+  const cellOf = (e) => {
+    const el = preRef.current;
+    if (!el) return [0, 0];
+    const r = el.getBoundingClientRect();
+    return [Math.floor((e.clientX - r.left) / S.cw), Math.floor((e.clientY - r.top) / S.rh)];
+  };
+
+  /* a fast stroke lands as a line, not confetti — walk the segment */
+  const strokeTo = (x, y) => {
+    const from = lastCell.current || [x, y];
+    const steps = Math.max(Math.abs(x - from[0]), Math.abs(y - from[1])) || 1;
+    for (let i = 1; i <= steps; i++) {
+      stampAt(Math.round(from[0] + (x - from[0]) * i / steps),
+              Math.round(from[1] + (y - from[1]) * i / steps));
+    }
+    lastCell.current = [x, y];
+  };
+
+  const onDown = (e) => {
+    e.preventDefault();
+    if (preRef.current && e.pointerId !== undefined) {
+      try { preRef.current.setPointerCapture(e.pointerId); } catch (err) { /* fine */ }
+    }
+    drawing.current = true;
+    lastCell.current = null;
+    strokeTo(...cellOf(e));
+  };
+  const onMove = (e) => { if (drawing.current) strokeTo(...cellOf(e)); };
+  const onUp = () => { drawing.current = false; lastCell.current = null; };
+
+  const flash = (m) => {
+    setMsg(m);
+    clearTimeout(msgTimer.current);
+    msgTimer.current = setTimeout(() => setMsg(''), 1800);
+  };
+
+  const clearAll = () => {
+    if (S.ink) { S.ink.fill(0); S.fuel.fill(0); S.chars.fill(''); }
+    flash('wiped. the phosphor forgives.');
+  };
+
+  const save = async () => {
+    const txt = preRef.current ? preRef.current.textContent : '';
+    try {
+      await navigator.clipboard.writeText(txt);
+      flash('copied — raw ascii, frame it');
+    } catch (err) {
+      flash('clipboard said no');
+    }
+  };
+
+  return (
+    <div className="paint">
+      <div className="paint-bar">
+        <span className="paint-title">tzm-paint</span>
+        {PAINT_TOOLS.map((tl) => (
+          <button
+            key={tl}
+            className={`pbtn ${tool === tl ? 'on' : ''}`}
+            onClick={() => setTool(tl)}
+          >{tl}</button>
+        ))}
+        <button
+          className="pbtn"
+          onClick={() => setPenIdx((penIdx + 1) % PEN_CHARS.length)}
+          title="pen glyph"
+        >[{PEN_CHARS[penIdx]}]</button>
+        <button
+          className="pbtn"
+          onClick={() => setMirror(MIRRORS[(MIRRORS.indexOf(mirror) + 1) % MIRRORS.length])}
+        >mir:{mirror}</button>
+        <span className="paint-spacer"></span>
+        <button className="pbtn" onClick={clearAll}>clear</button>
+        <button className="pbtn" onClick={save}>copy</button>
+        <button className="pbtn warn" onClick={onExit}>exit</button>
+      </div>
+      <pre
+        className="paint-canvas"
+        ref={preRef}
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerCancel={onUp}
+      />
+      <div className="paint-foot">
+        {msg || 'draw with anything that points · fire keeps burning · esc exits'}
+      </div>
+    </div>
+  );
+}
+
+/* ==================== the whisper ====================
+   Leave the monitor off long enough and someone starts typing on it.
+   The film played this on a sleeping screen too — the tube is dark, the
+   LED says standby, and the text glows anyway. It goes further than the
+   script did: after the rabbit, a trace program reads out what it can
+   see of *you* — all of it straight off the browser, nothing sent
+   anywhere. Any key kills it, which is exactly what Neo did. */
+
+function MatrixWhisper({ user, tick, onDone }) {
+  const [line, setLine] = useState('');
+  const [trace, setTrace] = useState([]);
+  const [rabbit, setRabbit] = useState(-1);
+
+  useEffect(() => {
+    let alive = true;
+    const timers = [];
+    const wait = (ms) => new Promise((res) => { timers.push(setTimeout(res, ms)); });
+
+    (async () => {
+      let cur = '';
+      const put = () => { if (alive) setLine(cur); };
+      const type = async (text, spd = 90) => {
+        for (const ch of text) {
+          if (!alive) return;
+          cur += ch; put();
+          if (tick) tick();
+          await wait(spd + Math.random() * 90);
+        }
+      };
+      const erase = async (spd = 26) => {
+        while (cur.length) {
+          if (!alive) return;
+          cur = cur.slice(0, -1); put();
+          await wait(spd);
+        }
+      };
+
+      await wait(1600);
+      await type(`Wake up, ${user}...`);
+      await wait(2000); await erase(); await wait(800);
+
+      await type('The Matrix has you...');
+      await wait(1900); await erase(); await wait(800);
+
+      await type('Follow the white rabbit.');
+      await wait(500);
+      for (let x = -6; x <= 104 && alive; x += 2.4) {
+        setRabbit(x);
+        await wait(46);
+      }
+      setRabbit(-1);
+      await wait(500); await erase(); await wait(900);
+
+      await type(`Knock, knock, ${user}.`);
+      await wait(2100); await erase(); await wait(700);
+
+      /* -- beyond the script: the trace turns around and reads the reader -- */
+      await type('> trace program: running', 34);
+      const nav = navigator;
+      const info = [
+        `> node ......... ${(nav.userAgentData && nav.userAgentData.platform) || nav.platform || 'unknown'}`,
+        `> viewport ..... ${window.innerWidth}x${window.innerHeight} @ ${window.devicePixelRatio || 1}x`,
+        `> lang ......... ${nav.language || '??'}`,
+        `> tz ........... ${Intl.DateTimeFormat().resolvedOptions().timeZone || 'nowhere'}`,
+        `> threads ...... ${nav.hardwareConcurrency || '?'} cores`,
+        `> uplink ....... ${nav.onLine ? 'alive' : 'severed'}`,
+      ];
+      for (const l of info) {
+        if (!alive) return;
+        setTrace((a) => [...a, l]);
+        if (tick) tick();
+        await wait(260);
+      }
+      await wait(1100);
+      cur = ''; put();
+      await type('> you are already inside.', 65);
+      await wait(2400);
+      if (alive) onDone();
+    })();
+
+    return () => { alive = false; timers.forEach(clearTimeout); };
+  }, []);
+
+  return (
+    <div className="whisper" aria-hidden="true">
+      <div className="whisper-line">{line}<span className="cursor">{'█'}</span></div>
+      {trace.length > 0 && (
+        <div className="whisper-trace">
+          {trace.map((l, i) => <div key={i}>{l}</div>)}
+        </div>
+      )}
+      {rabbit >= 0 && (
+        <div className="whisper-rabbit" style={{ left: `${rabbit}%` }}>{'(\\_/)'}</div>
+      )}
+    </div>
+  );
+}
+
+/* ==================== dust motes ====================
+   The room's dust, drifting through the cone of light in front of the
+   glass. They live outside the raster — the tube doesn't draw them, it
+   only illuminates them — and they're the one thing here allowed to
+   move without the beam's permission. Desktop-only: a phone gets held
+   too close for floating dust to read as anything but dirt. */
+
+function Motes() {
+  const motes = useMemo(() => {
+    if (prefersReducedMotion()) return [];
+    if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return [];
+    return Array.from({ length: 9 }, () => ({
+      x: rnd(4, 96), y: rnd(6, 92),
+      s: rnd(1, 2.1),
+      dur: rnd(16, 38), delay: -rnd(0, 30),
+      dx: rnd(-16, 16), dy: -rnd(8, 26),
+      o: rnd(0.05, 0.16),
+    }));
+  }, []);
+  if (!motes.length) return null;
+  return (
+    <div className="motes" aria-hidden="true">
+      {motes.map((m, i) => (
+        <span
+          key={i}
+          style={{
+            left: `${m.x}%`, top: `${m.y}%`,
+            width: m.s, height: m.s,
+            '--mo': m.o,
+            '--mdx': `${m.dx}px`, '--mdy': `${m.dy}px`,
+            animationDuration: `${m.dur}s`,
+            animationDelay: `${m.delay}s`,
+          }}
+        />
+      ))}
     </div>
   );
 }
@@ -1685,6 +2354,9 @@ function App() {
   const [warming, setWarming] = useState(false);
   const [degaussing, setDegaussing] = useState(false);
   const [wiping, setWiping] = useState(false);
+  const [saver, setSaver] = useState(false);
+  const [whisper, setWhisper] = useState(false);
+  const [paint, setPaint] = useState(false);
   const timers = useRef([]);
   const crtRef = useRef(null);
 
@@ -1727,8 +2399,46 @@ function App() {
     after(60, () => { if (inputRef.current) inputRef.current.focus(); });
   }, [after, degauss, sound]);
 
-  /* the tube degausses when it warms up, like every CRT ever made */
-  useEffect(() => { degauss(); }, []);
+  /* A tube doesn't open on a full picture. First load runs the same
+     cathode warm-up the power switch does — the raster climbs out of a
+     line while the BIOS is already typing into it — and then the coil
+     fires, like every CRT ever made. */
+  useEffect(() => {
+    setWarming(true);
+    after(760, () => { setWarming(false); degauss(); });
+  }, []);
+
+  /* A monitor left off is not necessarily alone. Give the dark a moment
+     to settle first — the delay is rolled so it never knocks on schedule. */
+  useEffect(() => {
+    if (power !== 'off') { setWhisper(false); return; }
+    const id = setTimeout(() => setWhisper(true), 6000 + Math.random() * 6000);
+    return () => clearTimeout(id);
+  }, [power]);
+
+  /* After Dark rules: three quiet minutes and the saver owns the tube.
+     Only while the machine is actually showing something worth saving —
+     never over the boot, never over a dead screen. */
+  useEffect(() => {
+    /* the studio holds the floor: no saver over someone's half-made art */
+    if (phase !== 'done' || power !== 'on' || paint) { setSaver(false); return; }
+    const IDLE_MS = 180000;
+    let id = 0;
+    const arm = () => { clearTimeout(id); id = setTimeout(() => setSaver(true), IDLE_MS); };
+    arm();
+    const bump = () => arm();
+    window.addEventListener('pointermove', bump, { passive: true });
+    window.addEventListener('pointerdown', bump, { passive: true });
+    window.addEventListener('keydown', bump);
+    window.addEventListener('touchstart', bump, { passive: true });
+    return () => {
+      clearTimeout(id);
+      window.removeEventListener('pointermove', bump);
+      window.removeEventListener('pointerdown', bump);
+      window.removeEventListener('keydown', bump);
+      window.removeEventListener('touchstart', bump);
+    };
+  }, [phase, power, paint]);
 
   /* switching sound on mid-session: the tube is already scanning, so it
      should already be singing — don't wait for the next power cycle */
@@ -1904,9 +2614,40 @@ function App() {
     } else if (c === 'hardware' || c === 'specs' || c === 'neofetch') {
       out = { kind: 'hardware' };
     } else if (c === 'matrix') {
-      out = { kind: 'matrix' };
-    } else if (c === 'demo' || c === 'fx') {
-      out = { kind: 'demo' };
+      out = { kind: 'demo', name: 'matrix' };
+    } else if (c === 'paint' || c === 'draw' || c === 'studio') {
+      setHistory(h => [...h, echo, { kind: 'text', text: 'tzm-paint: the phosphor is yours. esc hands it back.' }]);
+      after(350, () => setPaint(true));
+      return;
+    } else if (c === 'demo' || c === 'fx' || c.startsWith('demo ') || c.startsWith('fx ')) {
+      const arg = c.replace(/^(demo|fx)\s*/, '').trim();
+      if (arg === 'list' || arg === 'ls' || arg === '-l') {
+        out = { kind: 'text', text: DEMOS.map(d => d.name).join('  ·  ') };
+      } else if (arg) {
+        const flat = (s) => s.replace(/[^a-z0-9]/g, '');
+        const hit = DEMOS.find(d => d.name === arg || flat(d.name) === flat(arg));
+        out = hit
+          ? { kind: 'demo', name: hit.name }
+          : { kind: 'text', text: `demo: no effect '${arg}'. try 'demo list'`, warn: true };
+      } else {
+        out = { kind: 'demo' };
+      }
+    } else if (c === 'screensaver' || c === 'saver' || c === 'afterdark') {
+      setHistory(h => [...h, echo, { kind: 'text', text: 'saving the phosphor ... any key hands it back.' }]);
+      after(500, () => setSaver(true));
+      return;
+    } else if (c === 'phosphor' || c.startsWith('phosphor ')) {
+      const tubes = ['green', 'amber', 'white', 'cyan', 'magenta'];
+      const arg = c.split(/\s+/)[1];
+      if (!arg) {
+        out = { kind: 'text', text: `current tube: ${v.phosphor}. usage: phosphor <${tubes.join('|')}>` };
+      } else if (tubes.includes(arg)) {
+        setTweak('phosphor', arg);
+        degauss();
+        out = { kind: 'text', text: `tube swapped: ${arg} phosphor. firing the coil to settle the mask.` };
+      } else {
+        out = { kind: 'text', text: `phosphor: no '${arg}' tube in stock. try: ${tubes.join(', ')}`, warn: true };
+      }
     } else if (c === 'cats' || c === 'cat cats') {
       /* off the strip and out of help, but neofetch's "17527 cat photos"
          sets it up, so it stays here for anyone who goes looking */
@@ -1944,7 +2685,7 @@ function App() {
     }
     setHistory(h => [...h, echo, out]);
     setTimeout(() => { if (inputRef.current) inputRef.current.focus(); }, 100);
-  }, [after, degauss, powerOff, v.sound, setTweak]);
+  }, [after, degauss, powerOff, v.sound, v.phosphor, setTweak]);
 
   runCommandRef.current = runCommand;
 
@@ -2005,6 +2746,17 @@ function App() {
       ref={crtRef}
     >
       <div className="bezel">
+        {/* the housing is a thing, not a border: an embossed badge pressed
+            into the plastic and the four screws holding the shell on */}
+        <div className="bezel-brand" aria-hidden="true">
+          TheZakMan<span className="reg">®</span><em>CRT-1987</em>
+        </div>
+        <div className="screws" aria-hidden="true"></div>
+        <div className="vents" aria-hidden="true"></div>
+        <div className="serial" aria-hidden="true">
+          <span className="bars"></span>
+          <span className="no">MOD. CRT-1987 · S/N 19870042 · 110-220V~</span>
+        </div>
         <div className="screen">
           <div className="scanlines"></div>
           <div className="vignette"></div>
@@ -2028,6 +2780,16 @@ function App() {
               to give the room room to move; the rim's brightest stop would
               land outside the screen and get clipped away. */}
           {v.reflection > 0 && <div className="rim"></div>}
+
+          {/* The near light — a lamp closer to the glass than the room is.
+              It rides the same --vx/--vy but travels further per head-move
+              than the room layer: two reflections parallaxing at different
+              rates is what makes the glass read as having depth, not just
+              a picture of a reflection. */}
+          {v.reflection > 0 && <div className="glare"></div>}
+
+          {/* dust hanging in the light in front of the tube */}
+          {v.grime && <Motes />}
 
           {/* the glass itself: 30 years of dust, fingerprints and dead subpixels */}
           {v.grime && (
@@ -2069,6 +2831,11 @@ function App() {
                 {/* NEOFETCH */}
                 <FullPrompt cmd="neofetch" />
                 <NeofetchBlock />
+
+                {/* one line of signposting for whoever just walked in */}
+                <div className="out first-hint">
+                  tip: type <span className="hi">help</span> — tab completes · the strip below is clickable
+                </div>
 
                 {/* DYNAMIC HISTORY */}
                 {history.map((h, i) => {
@@ -2131,8 +2898,7 @@ function App() {
                     </dl>
                   );
                   if (h.kind === 'hardware') return <NeofetchBlock key={i} />;
-                  if (h.kind === 'matrix') return <MatrixRain key={i} />;
-                  if (h.kind === 'demo') return <DemoFX key={i} />;
+                  if (h.kind === 'demo') return <DemoFX key={i} name={h.name} />;
                   if (h.kind === 'cats') return (
                     <div key={i} className="out">
                       <pre className="catart">{String.raw`
@@ -2162,6 +2928,11 @@ function App() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKey}
+                  /* sized to the text so the block cursor sits where the
+                     next glyph lands — parked at the far right it reads as
+                     a stuck pixel, not a caret. ch is exact: every face
+                     here is monospace. */
+                  style={{ width: `calc(${input.length}ch + 10px)` }}
                   autoFocus
                   spellCheck={false}
                   autoComplete="off"
@@ -2176,7 +2947,38 @@ function App() {
             </div>
           )}
 
+          {/* the studio takes the raster over, same plane as the saver */}
+          {paint && phase === 'done' && power === 'on' && (
+            <PaintStudio onExit={() => {
+              setPaint(false);
+              setTimeout(() => { if (inputRef.current) inputRef.current.focus(); }, 60);
+            }} />
+          )}
+
+          {/* the saver draws inside the raster: it's emitted light like
+              everything else, so the glass, scanlines and curvature all
+              stay on top of it */}
+          {saver && phase === 'done' && power === 'on' && (
+            <Screensaver onWake={() => setSaver(false)} />
+          )}
+
           </div>{/* /.raster */}
+
+          {/* the tube is off. that has never stopped this text. */}
+          {power === 'off' && whisper && (
+            <MatrixWhisper
+              user="guest"
+              tick={v.sound ? sound.keyTick : null}
+              onDone={() => {
+                setWhisper(false);
+                powerOn();
+                after(1200, () => setHistory(h => [
+                  ...h,
+                  { kind: 'text', text: '> trace terminated. the rabbit got away.' },
+                ]));
+              }}
+            />
+          )}
         </div>
 
         <div className="bezel-tag">
