@@ -282,6 +282,29 @@ function useCrtSound(enabled, volume) {
     if (a) a.master.gain.value = volume;
   }, [volume, enabled]);
 
+  /* On by default now, but an AudioContext built without a user gesture is
+     born suspended and no site can talk its way out of that — the tube would
+     just sit there mute with a lit button. So take the first gesture of any
+     kind as the cue. The boot invites a tap to skip, so in practice it starts
+     singing straight away. Stays subscribed rather than firing once: the
+     context can be suspended again by the browser at any point. */
+  useEffect(() => {
+    if (!enabled) return;
+    const kick = () => {
+      const a = rig.current;
+      if (a && a.ctx.state === 'suspended') a.ctx.resume();
+    };
+    kick();
+    window.addEventListener('pointerdown', kick);
+    window.addEventListener('keydown', kick);
+    window.addEventListener('touchstart', kick);
+    return () => {
+      window.removeEventListener('pointerdown', kick);
+      window.removeEventListener('keydown', kick);
+      window.removeEventListener('touchstart', kick);
+    };
+  }, [enabled]);
+
   /* the tube stops singing when it stops scanning */
   const setPowered = useCallback((on) => {
     const a = rig.current;
@@ -1638,7 +1661,7 @@ function App() {
     "reflection": 0.7,
     "deadpix": 0.2,
     "grime": true,
-    "sound": false,
+    "sound": true,
     "volume": 0.5,
     "flicker": true,
     "jitter": true,
