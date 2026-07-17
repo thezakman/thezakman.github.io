@@ -3041,30 +3041,40 @@ function Motes() {
   const motes = useMemo(() => {
     if (prefersReducedMotion()) return [];
     if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return [];
-    return Array.from({ length: 14 }, () => ({
-      x: rnd(18, 82),
-      y: rnd(12, 84),
-      s: rnd(1.2, 2.6),
-      dur: rnd(20, 44), delay: -rnd(0, 30),
-      dx: rnd(-12, 12), dy: -rnd(10, 26),
-      o: rnd(0.07, 0.2),
+    return Array.from({ length: 16 }, () => ({
+      x: rnd(16, 84),
+      y: rnd(10, 86),
+      s: rnd(1, 2.2),
+      dur: rnd(26, 52), delay: -rnd(0, 40),
+      dx: rnd(-10, 10), dy: -rnd(8, 22),
+      o: rnd(0.04, 0.12),
+      /* each grain sits at its own depth: closer ones (bigger) swing
+         further as the pointer moves, which is what sells "in the air" */
+      pf: rnd(0.5, 1.6),
     }));
   }, []);
   if (!motes.length) return null;
   return (
     <div className="motes room" aria-hidden="true">
       {motes.map((m, i) => (
+        /* wrap carries the pointer parallax (per-grain depth), the dot
+           inside carries the slow float — two transforms, no conflict */
         <span
           key={i}
-          style={{
-            left: `${m.x}%`, top: `${m.y}%`,
-            width: m.s, height: m.s,
-            '--mo': m.o,
-            '--mdx': `${m.dx}px`, '--mdy': `${m.dy}px`,
-            animationDuration: `${m.dur}s`,
-            animationDelay: `${m.delay}s`,
-          }}
-        />
+          className="mote-wrap"
+          style={{ left: `${m.x}%`, top: `${m.y}%`, '--pf': m.pf }}
+        >
+          <span
+            className="mote-dot"
+            style={{
+              width: m.s, height: m.s,
+              '--mo': m.o,
+              '--mdx': `${m.dx}px`, '--mdy': `${m.dy}px`,
+              animationDuration: `${m.dur}s`,
+              animationDelay: `${m.delay}s`,
+            }}
+          />
+        </span>
       ))}
     </div>
   );

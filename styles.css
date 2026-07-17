@@ -39,7 +39,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 14px;
   font-family: var(--font-body);
   font-size: var(--font-size);
   color: var(--fg);
@@ -50,14 +50,14 @@ body {
 
 .bezel {
   position: relative;
-  width: min(1400px, 100%);
+  width: min(1580px, 100%);
   height: 100%;
   background:
     radial-gradient(ellipse at 30% 10%, #35312b 0%, transparent 40%),
     radial-gradient(ellipse at 70% 90%, #1e1b16 0%, transparent 40%),
     linear-gradient(180deg, #2c2822 0%, #1c1915 30%, #141210 60%, #0e0c0a 100%);
-  border-radius: 32px;
-  padding: 36px 36px 64px;
+  border-radius: 40px;
+  padding: 48px 48px 86px;
   box-shadow:
     inset 0 2px 0 rgba(255,255,255,0.08),
     inset 0 -2px 0 rgba(0,0,0,0.7),
@@ -76,7 +76,7 @@ body {
 .bezel::before {
   content: '';
   position: absolute; inset: 0;
-  border-radius: 32px;
+  border-radius: 40px;
   background:
     repeating-linear-gradient(90deg, rgba(255,255,255,0.008) 0 1px, transparent 1px 3px),
     repeating-linear-gradient(180deg, rgba(255,255,255,0.004) 0 1px, transparent 1px 5px),
@@ -108,8 +108,8 @@ body {
 .bezel::after {
   content: '';
   position: absolute;
-  top: 30px; left: 30px; right: 30px; bottom: 58px;
-  border-radius: 20px;
+  top: 40px; left: 40px; right: 40px; bottom: 78px;
+  border-radius: 26px;
   box-shadow:
     inset 0 2px 4px rgba(0,0,0,0.8),
     inset 0 -1px 2px rgba(255,255,255,0.04),
@@ -122,7 +122,7 @@ body {
    instead of pushing the bezel — it has to stay one line at every width. */
 .bezel-tag {
   position: absolute;
-  bottom: 18px;
+  bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -130,17 +130,17 @@ body {
   flex-wrap: nowrap;
   white-space: nowrap;
   max-width: 100%;
-  gap: 16px;
+  gap: 20px;
   color: #5a5048;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
+  font-size: 14px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   z-index: 5;
 }
 .bezel-tag .copyleft { color: #6a6358; letter-spacing: 0.08em; }
 .bezel-tag .led {
-  width: 8px; height: 8px; border-radius: 50%;
+  width: 10px; height: 10px; border-radius: 50%;
   background: var(--fg);
   box-shadow: 0 0 8px var(--glow), 0 0 16px var(--glow), 0 0 24px color-mix(in oklab, var(--glow) 40%, transparent);
 }
@@ -154,14 +154,14 @@ body {
 
 .bezel-brand {
   position: absolute;
-  top: 11px;
-  left: 40px;
+  top: 15px;
+  left: 52px;
   z-index: 5;
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 13px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.34em;
   text-transform: uppercase;
@@ -171,7 +171,7 @@ body {
   user-select: none;
 }
 .bezel-brand .reg {
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 400;
   letter-spacing: 0;
   margin-left: 1px;
@@ -179,7 +179,7 @@ body {
 .bezel-brand em {
   font-style: normal;
   font-weight: 400;
-  font-size: 8px;
+  font-size: 10px;
   letter-spacing: 0.22em;
   color: #4a423a;
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
@@ -188,17 +188,17 @@ body {
 /* exhaust slots over the flyback — the corner that always ran hot */
 .vents {
   position: absolute;
-  top: 12px;
-  right: 52px;
-  width: 148px;
-  height: 12px;
+  top: 16px;
+  right: 66px;
+  width: 188px;
+  height: 15px;
   pointer-events: none;
   z-index: 5;
   background:
     repeating-linear-gradient(90deg,
-      rgba(0, 0, 0, 0.5) 0 3px,
-      rgba(255, 255, 255, 0.025) 3px 3.5px,
-      transparent 3.5px 9px);
+      rgba(0, 0, 0, 0.5) 0 3.8px,
+      rgba(255, 255, 255, 0.025) 3.8px 4.4px,
+      transparent 4.4px 11px);
   border-radius: 2px;
 }
 
@@ -206,13 +206,13 @@ body {
    they always are */
 .serial {
   position: absolute;
-  bottom: 14px;
-  right: 36px;
+  bottom: 18px;
+  right: 48px;
   z-index: 5;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 3px 6px 3px;
+  gap: 3px;
+  padding: 4px 8px;
   background: linear-gradient(180deg, #a8a294 0%, #948d7d 100%);
   border-radius: 1px;
   transform: rotate(-0.9deg);
@@ -223,15 +223,15 @@ body {
 }
 .serial .bars {
   display: block;
-  height: 6px;
+  height: 8px;
   background: repeating-linear-gradient(90deg,
-    #1c1a16 0 1px, transparent 1px 2.6px,
-    #1c1a16 2.6px 4.2px, transparent 4.2px 5.2px,
-    #1c1a16 5.2px 5.7px, transparent 5.7px 7.4px);
+    #1c1a16 0 1.3px, transparent 1.3px 3.3px,
+    #1c1a16 3.3px 5.3px, transparent 5.3px 6.5px,
+    #1c1a16 6.5px 7.1px, transparent 7.1px 9.3px);
 }
 .serial .no {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 6px;
+  font-size: 8px;
   letter-spacing: 0.06em;
   color: #26231d;
   white-space: nowrap;
@@ -271,10 +271,10 @@ body {
   pointer-events: none;
   z-index: 5;
   background-image:
-    radial-gradient(circle 4.5px at 21px 21px,           #0d0b09 0 1.6px, #3a352d 2.2px, #15120f 3.1px, #000 3.8px, transparent 4.5px),
-    radial-gradient(circle 4.5px at calc(100% - 21px) 21px, #0d0b09 0 1.6px, #38332b 2.2px, #14110e 3.1px, #000 3.8px, transparent 4.5px),
-    radial-gradient(circle 4.5px at 21px calc(100% - 21px), #0c0a08 0 1.6px, #322d26 2.2px, #13100d 3.1px, #000 3.8px, transparent 4.5px),
-    radial-gradient(circle 4.5px at calc(100% - 21px) calc(100% - 21px), #0c0a08 0 1.6px, #342f27 2.2px, #13100d 3.1px, #000 3.8px, transparent 4.5px);
+    radial-gradient(circle 6px at 27px 27px,           #0d0b09 0 2.1px, #3a352d 2.9px, #15120f 4.1px, #000 5px, transparent 6px),
+    radial-gradient(circle 6px at calc(100% - 27px) 27px, #0d0b09 0 2.1px, #38332b 2.9px, #14110e 4.1px, #000 5px, transparent 6px),
+    radial-gradient(circle 6px at 27px calc(100% - 27px), #0c0a08 0 2.1px, #322d26 2.9px, #13100d 4.1px, #000 5px, transparent 6px),
+    radial-gradient(circle 6px at calc(100% - 27px) calc(100% - 27px), #0c0a08 0 2.1px, #342f27 2.9px, #13100d 4.1px, #000 5px, transparent 6px);
 }
 
 /* ====================== SCREEN & CRT FX ====================== */
@@ -983,12 +983,23 @@ body {
   z-index: 16;
   pointer-events: none;
 }
-.motes span {
+/* each grain: an outer wrap that slides with the pointer (parallax by
+   depth) and an inner dot that floats slowly on its own — the two
+   transforms compose into dust hanging in the air, nudged as you move */
+.mote-wrap {
   position: absolute;
+  transform: translate3d(
+    calc(var(--vx, 0) * var(--pf, 1) * 26px),
+    calc(var(--vy, 0) * var(--pf, 1) * 22px),
+    0);
+  will-change: transform;
+}
+.mote-dot {
+  display: block;
   border-radius: 50%;
   background: #fff;
   opacity: var(--mo, 0.1);
-  filter: blur(0.4px);
+  filter: blur(0.5px);
   animation-name: mote-drift;
   animation-timing-function: ease-in-out;
   animation-iteration-count: infinite;
@@ -996,7 +1007,7 @@ body {
 }
 @keyframes mote-drift {
   0%   { transform: translate3d(0, 0, 0); }
-  50%  { opacity: calc(var(--mo, 0.1) * 1.6); }
+  50%  { opacity: calc(var(--mo, 0.1) * 1.5); }
   100% { transform: translate3d(var(--mdx, 10px), var(--mdy, -14px), 0); }
 }
 
@@ -1014,9 +1025,9 @@ body {
   -webkit-mask-image: radial-gradient(52% 56% at 50% 47%, #000 34%, transparent 82%);
   mask-image: radial-gradient(52% 56% at 50% 47%, #000 34%, transparent 82%);
 }
-.motes.room span {
-  background: color-mix(in oklab, var(--glow) 62%, #fff);
-  box-shadow: 0 0 4px color-mix(in oklab, var(--glow) 50%, transparent);
+.motes.room .mote-dot {
+  background: color-mix(in oklab, var(--glow) 58%, #fff);
+  box-shadow: 0 0 3px color-mix(in oklab, var(--glow) 30%, transparent);
 }
 /* tube off, light off — the dust is still there, you just can't see it */
 .crt.powered-off .motes.room { opacity: 0.1; }
@@ -1154,11 +1165,11 @@ body {
   z-index: 10;
   display: flex;
   align-items: center;
-  gap: 22px;
-  padding: 10px 22px;
+  gap: 26px;
+  padding: 12px 26px;
   border-bottom: 1px solid color-mix(in oklab, var(--fg) 22%, transparent);
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
+  font-size: 13px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--fg);
@@ -1555,8 +1566,8 @@ body {
 }
 .knob-cap {
   position: relative;
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background:
     repeating-conic-gradient(rgba(255, 255, 255, 0.05) 0 8deg, transparent 8deg 16deg),
@@ -1571,16 +1582,16 @@ body {
   content: '';
   position: absolute;
   left: 50%;
-  top: 2px;
-  width: 2px;
-  height: 7px;
-  margin-left: -1px;
+  top: 3px;
+  width: 2.5px;
+  height: 9px;
+  margin-left: -1.25px;
   border-radius: 1px;
   background: #948a76;
 }
 .knob-label {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 6.5px;
+  font-size: 8px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: #564e45;
@@ -1592,15 +1603,15 @@ body {
    detented block — a real front panel was molded in one pass, not three. */
 .hw-btn {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: #7d7466;
   background: linear-gradient(180deg, #332e27 0%, #1a1612 55%, #100d0a 100%);
   border: 1px solid #0b0908;
-  border-radius: 4px;
-  height: 30px;
-  padding: 0 14px;
+  border-radius: 5px;
+  height: 38px;
+  padding: 0 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1617,14 +1628,14 @@ body {
   box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.95);
 }
 /* the note glyph needs more point size to weigh the same as the labels */
-.hw-btn.snd { font-size: 13px; padding: 0 12px; }
+.hw-btn.snd { font-size: 16px; padding: 0 15px; }
 .hw-btn:focus-visible { outline: 1px solid var(--fg); outline-offset: 2px; }
 .hw-btn:disabled { opacity: 0.35; cursor: default; }
 .hw-btn.power {
-  font-size: 15px;
+  font-size: 19px;
   letter-spacing: 0;
   line-height: 1;
-  padding: 0 16px;
+  padding: 0 20px;
 }
 .hw-btn.lit {
   color: var(--fg);
@@ -1641,7 +1652,7 @@ body {
   width: 100%;
   gap: 1px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
+  font-size: 13px;
   user-select: none;
 }
 
@@ -1659,7 +1670,7 @@ body {
 }
 
 .fk-n {
-  padding: 3px 4px 3px 2px;
+  padding: 5px 5px 5px 3px;
   opacity: 0.7;
   text-shadow: var(--text-shadow);
   flex-shrink: 0;
@@ -1669,7 +1680,7 @@ body {
 .fk-label {
   flex: 1;
   min-width: 0;
-  padding: 3px 6px;
+  padding: 5px 8px;
   background: color-mix(in oklab, var(--fg) 82%, var(--bg));
   color: var(--bg);
   text-shadow: none;
@@ -2141,26 +2152,39 @@ body {
 
 @media (max-width: 900px) {
   .crt { padding: 6px; }
-  .bezel { padding: 10px 10px 36px; border-radius: 20px; }
+  .bezel { padding: 10px 10px 54px; border-radius: 20px; }
   /* the thin mobile bezel has no plastic left to emboss or screw into */
   .bezel-brand, .screws, .vents, .serial { display: none; }
-  .hw-controls { left: 10px; bottom: 5px; gap: 6px; }
-  .bezel::after { top: 6px; left: 6px; right: 6px; bottom: 32px; border-radius: 14px; }
+  /* controls on the left, power on the right, both in the chin band —
+     no more colliding with the f-key strip above */
+  .hw-controls { left: 10px; bottom: 9px; gap: 8px; }
+  .hw-controls .hw-btn { height: 30px; font-size: 8px; padding: 0 10px; }
+  .hw-controls .hw-btn.snd { font-size: 12px; padding: 0 9px; }
+  .bezel::after { top: 6px; left: 6px; right: 6px; bottom: 50px; border-radius: 14px; }
   .statusbar { font-size: 9px; gap: 10px; padding: 8px 10px; }
   .terminal { padding: 12px 12px 60px; font-size: 17px; }
   .socrow { font-size: 12px; }
   .out.grid2 { grid-template-columns: 1fr; }
   .neofetch { grid-template-columns: 80px 1fr; gap: 12px; }
   .phosphor-img.neofetch-logo { height: 80px; }
-  /* the switches earn their room; the credit line gives way */
-  .bezel-tag { font-size: 9px; gap: 8px; }
-  .bezel-tag .copyleft { overflow: hidden; text-overflow: ellipsis; }
+  /* the switches earn their room; the credit line gives way. The
+     bezel-tag drops the copyleft and parks the power on the right so it
+     never sits under the strip. */
+  .bezel-tag {
+    font-size: 9px;
+    gap: 8px;
+    left: auto;
+    right: 10px;
+    bottom: 13px;
+    transform: none;
+  }
+  .bezel-tag .copyleft { display: none; }
 }
 
 @media (max-width: 600px) {
   .crt { padding: 0; }
   .bezel {
-    padding: 4px 4px 30px;
+    padding: 4px 4px 52px;
     border-radius: 14px;
     box-shadow:
       inset 0 1px 0 rgba(255,255,255,0.04),
@@ -2168,7 +2192,9 @@ body {
   }
   .screen { border-radius: 10px; }
   .crt.curved .screen { border-radius: 12px; }
-  .bezel::after { top: 2px; left: 2px; right: 2px; bottom: 26px; border-radius: 12px; }
+  .bezel::after { top: 2px; left: 2px; right: 2px; bottom: 48px; border-radius: 12px; }
+  .hw-controls { bottom: 10px; gap: 7px; }
+  .hw-controls .hw-btn { height: 27px; }
   .statusbar {
     font-size: 8px;
     gap: 6px;
@@ -2194,7 +2220,7 @@ body {
   .catart { font-size: 14px; }
   .specs { font-size: 11px; }
   .out.grid2 { gap: 2px 12px; }
-  .bezel-tag { font-size: 7px; gap: 6px; bottom: 8px; }
+  .bezel-tag { font-size: 7px; gap: 6px; bottom: 13px; right: 8px; }
   .bezel-tag .led { width: 6px; height: 6px; }
   .bezel-tag .copyleft { display: none; }
 }
@@ -2221,11 +2247,11 @@ body {
   .ls { font-size: 10.5px; }
   .lsrow { grid-template-columns: 3.2em auto auto 1fr; gap: 0 0.7em; }
   .lsrow .perm, .lsrow .mtime, .lsrow .dim { display: none; }
-  .bezel-tag .hw-btn { font-size: 7px; height: 21px; padding: 0 7px; }
-  .bezel-tag .hw-btn.snd { font-size: 10px; padding: 0 7px; }
-  .bezel-tag .hw-btn.power { font-size: 11px; padding: 0 9px; }
+  .hw-controls .hw-btn { height: 27px; font-size: 7px; padding: 0 8px; }
+  .hw-controls .hw-btn.snd { font-size: 11px; padding: 0 8px; }
+  .bezel-tag .hw-btn.power { font-size: 13px; height: 27px; padding: 0 11px; }
   .knob-label { display: none; }
-  .knob-cap { width: 16px; height: 16px; }
+  .knob-cap { width: 17px; height: 17px; }
   .bezel-sheen { display: none; }
 }
 
@@ -2245,7 +2271,7 @@ body {
   .terminal .out,
   .terminal .line,
   .saver-hint,
-  .motes span,
+  .mote-dot,
   .wake-intro.out,
   .raster.os-enter,
   .os-enter .statusbar,
