@@ -3038,46 +3038,107 @@ function WakeIntro({ onDone, tick, modem }) {
    anything but dirt on the screen. */
 
 function Motes() {
-  const motes = useMemo(() => {
-    if (prefersReducedMotion()) return [];
-    if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return [];
-    return Array.from({ length: 16 }, () => ({
-      x: rnd(16, 84),
-      y: rnd(10, 86),
-      s: rnd(1, 2.2),
-      dur: rnd(26, 52), delay: -rnd(0, 40),
-      dx: rnd(-10, 10), dy: -rnd(8, 22),
-      o: rnd(0.04, 0.12),
-      /* each grain sits at its own depth: closer ones (bigger) swing
-         further as the pointer moves, which is what sells "in the air" */
-      pf: rnd(0.5, 1.6),
-    }));
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (prefersReducedMotion()) return;
+    if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+    const host = ref.current;
+    if (!host) return;
+
+    /* a real little particle system: each grain wanders on its own, and
+       the pointer is a puff of air — grains inside its radius get pushed
+       outward and keep the momentum, then settle back to their drift.
+       Nothing moves in lockstep; that's the whole point. */
+    const N = 17;
+    const parts = Array.from({ length: N }, () => {
+      const el = document.createElement('span');
+      el.className = 'mote-dot';
+      const size = rnd(1, 2.4);
+      el.style.width = el.style.height = `${size}px`;
+      el.style.opacity = rnd(0.05, 0.13).toFixed(3);
+      host.appendChild(el);
+      return {
+        el, size,
+        x: Math.random(), y: Math.random(),   // normalized 0..1
+        vx: rnd(-0.01, 0.01), vy: rnd(-0.012, 0.004),
+        /* its own wander rhythm, so no two share a path */
+        px: rnd(0, 6.3), py: rnd(0, 6.3),
+        fx: rnd(0.05, 0.22), fy: rnd(0.05, 0.22),
+        wander: rnd(0.008, 0.02),
+      };
+    });
+
+    let w = host.clientWidth || 1, h = host.clientHeight || 1;
+    const ro = new ResizeObserver(() => { w = host.clientWidth || 1; h = host.clientHeight || 1; });
+    ro.observe(host);
+
+    /* pointer in this layer's normalized space; -1 means "not over us" */
+    let mx = -1, my = -1;
+    const onMove = (e) => {
+      const r = host.getBoundingClientRect();
+      mx = (e.clientX - r.left) / r.width;
+      my = (e.clientY - r.top) / r.height;
+    };
+    const onLeave = () => { mx = -1; my = -1; };
+    window.addEventListener('pointermove', onMove, { passive: true });
+    window.addEventListener('pointerleave', onLeave, { passive: true });
+
+    let raf = 0, last = 0, running = true;
+    const R = 0.16;          // air-puff radius
+    const tick = (now) => {
+      if (!running) return;
+      raf = requestAnimationFrame(tick);
+      const dt = Math.min(0.05, (now - (last || now)) / 1000);
+      last = now;
+      const t = now / 1000;
+      const aspect = w / h;
+
+      for (const p of parts) {
+        /* slow self-wander: a gentle sine acceleration, unique per grain */
+        let ax = Math.sin(t * p.fx + p.px) * p.wander;
+        let ay = Math.cos(t * p.fy + p.py) * p.wander - 0.004;  // faint rise
+
+        /* the puff: push radially away, strongest at the centre, and it
+           fades with distance so the edge of the gust is soft */
+        if (mx >= 0) {
+          const dx = (p.x - mx) * aspect;
+          const dy = p.y - my;
+          const d = Math.hypot(dx, dy);
+          if (d < R) {
+            const f = 1 - d / R;
+            const push = f * f * 1.9;
+            const inv = 1 / (d || 0.001);
+            ax += (dx * inv) * push / aspect;
+            ay += (dy * inv) * push;
+          }
+        }
+
+        p.vx = (p.vx + ax * dt) * 0.90;   // damping, so gusts decay
+        p.vy = (p.vy + ay * dt) * 0.90;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+
+        /* drift back in from the far side instead of piling at the edge */
+        if (p.x < -0.04) p.x = 1.04; else if (p.x > 1.04) p.x = -0.04;
+        if (p.y < -0.04) p.y = 1.04; else if (p.y > 1.04) p.y = -0.04;
+
+        p.el.style.transform = `translate3d(${(p.x * w).toFixed(1)}px, ${(p.y * h).toFixed(1)}px, 0)`;
+      }
+    };
+    raf = requestAnimationFrame(tick);
+
+    return () => {
+      running = false;
+      cancelAnimationFrame(raf);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerleave', onLeave);
+      ro.disconnect();
+      parts.forEach((p) => p.el.remove());
+    };
   }, []);
-  if (!motes.length) return null;
-  return (
-    <div className="motes room" aria-hidden="true">
-      {motes.map((m, i) => (
-        /* wrap carries the pointer parallax (per-grain depth), the dot
-           inside carries the slow float — two transforms, no conflict */
-        <span
-          key={i}
-          className="mote-wrap"
-          style={{ left: `${m.x}%`, top: `${m.y}%`, '--pf': m.pf }}
-        >
-          <span
-            className="mote-dot"
-            style={{
-              width: m.s, height: m.s,
-              '--mo': m.o,
-              '--mdx': `${m.dx}px`, '--mdy': `${m.dy}px`,
-              animationDuration: `${m.dur}s`,
-              animationDelay: `${m.delay}s`,
-            }}
-          />
-        </span>
-      ))}
-    </div>
-  );
+
+  return <div className="motes room" ref={ref} aria-hidden="true" />;
 }
 
 /* ==================== main app ==================== */

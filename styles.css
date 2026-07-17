@@ -983,32 +983,17 @@ body {
   z-index: 16;
   pointer-events: none;
 }
-/* each grain: an outer wrap that slides with the pointer (parallax by
-   depth) and an inner dot that floats slowly on its own — the two
-   transforms compose into dust hanging in the air, nudged as you move */
-.mote-wrap {
-  position: absolute;
-  transform: translate3d(
-    calc(var(--vx, 0) * var(--pf, 1) * 26px),
-    calc(var(--vy, 0) * var(--pf, 1) * 22px),
-    0);
-  will-change: transform;
-}
+/* each grain is a real particle: the rAF loop drives its position through
+   translate3d, so it wanders on its own and scatters from the pointer.
+   top/left pinned to 0 — the transform carries the whole position. */
 .mote-dot {
-  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
   border-radius: 50%;
   background: #fff;
-  opacity: var(--mo, 0.1);
   filter: blur(0.5px);
-  animation-name: mote-drift;
-  animation-timing-function: ease-in-out;
-  animation-iteration-count: infinite;
-  animation-direction: alternate;
-}
-@keyframes mote-drift {
-  0%   { transform: translate3d(0, 0, 0); }
-  50%  { opacity: calc(var(--mo, 0.1) * 1.5); }
-  100% { transform: translate3d(var(--mdx, 10px), var(--mdy, -14px), 0); }
+  will-change: transform;
 }
 
 /* Room dust: in front of the whole monitor, tinted by the phosphor and
