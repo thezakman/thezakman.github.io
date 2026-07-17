@@ -544,7 +544,73 @@ function useCrtSound(enabled, volume) {
     src.start(t + 1.5);
   }, []);
 
-  return { setPowered, degaussSound, powerOffSound, powerOnSound, keyTick, typeTick, clickSound, modemSound };
+  /* Lain's theme, sung by the tube. Not the .mid — a chiptune paraphrase
+     of Duvet's opening line, synthesized so it stays self-contained: a
+     triangle lead over a soft square pad, a slow B-minor melancholy. It
+     returns a stop() so the intro can cut it if the visitor skips. */
+  const lainTheme = useCallback(() => {
+    const a = rig.current;
+    if (!a) return () => {};
+    const { ctx, master } = a;
+    a.ctx.resume();
+
+    const bus = ctx.createGain();
+    bus.gain.value = 0.9;
+    bus.connect(master);
+
+    const A4 = 440;
+    const hz = (semi) => A4 * Math.pow(2, semi / 12);
+    const BPM = 93, beat = 60 / BPM;   // Duvet's actual tempo
+    const t0 = ctx.currentTime + 0.15;
+
+    /* The real thing: [semitone from A4, beats], transcribed straight from
+       the Duvet .mid (track 0, the vocal line) — the opening phrase,
+       "and you don't seem to understand". Not a paraphrase this time. */
+    const MEL = [
+      [-7, 0.5], [-8, 0.5], [-10, 0.5], [-8, 0.5], [-7, 0.5], [-5, 0.5], [-3, 0.5], [-10, 2],
+      [-7, 0.5], [-5, 0.5], [-10, 0.5], [-7, 0.5], [-5, 0.5], [-7, 0.5], [-8, 0.5], [-10, 0.5],
+      [-8, 0.5], [-7, 0.5], [-5, 0.5], [-3, 0.5], [-5, 1], [-7, 1],
+      [-7, 0.5], [-5, 0.5], [-10, 0.5], [-7, 0.5], [-5, 0.5], [-7, 0.5], [-8, 0.5], [-10, 0.5],
+    ];
+
+    const voice = (freq, at, dur, type, level) => {
+      const o = ctx.createOscillator();
+      o.type = type;
+      o.frequency.value = freq;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(level, at + 0.03);   // soft attack
+      g.gain.setValueAtTime(level, at + dur * 0.6);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + dur);   // release
+      o.connect(g); g.connect(bus);
+      o.start(at); o.stop(at + dur + 0.05);
+    };
+
+    let t = t0, first = 0, last = 0;
+    for (const [semi, beats] of MEL) {
+      const dur = beats * beat;
+      if (semi !== null) {
+        if (!first) first = t;
+        last = t + dur;
+        voice(hz(semi + 12), t, dur * 0.9, 'triangle', 0.05);  // lead, up an octave to sing
+        voice(hz(semi), t, dur * 0.9, 'sine', 0.03);           // body at the written pitch
+      }
+      t += dur;
+    }
+    /* a low drone on the tonic under the whole phrase */
+    voice(hz(-22), first, last - first, 'square', 0.012);
+
+    return () => {
+      try {
+        const now = ctx.currentTime;
+        bus.gain.cancelScheduledValues(now);
+        bus.gain.setValueAtTime(bus.gain.value, now);
+        bus.gain.linearRampToValueAtTime(0.0001, now + 0.25);
+      } catch (e) { /* already gone */ }
+    };
+  }, []);
+
+  return { setPowered, degaussSound, powerOffSound, powerOnSound, keyTick, typeTick, clickSound, modemSound, lainTheme };
 }
 
 /* ==================== type-on hook ==================== */
@@ -2945,12 +3011,13 @@ function MatrixWhisper({ tick, onDone }) {
    a login that lets you in, or a VHS tape rewinding to the start.
    All of them a few seconds, all of them one tap from the shell. */
 
-function WakeIntro({ onDone, tick, modem }) {
+function WakeIntro({ onDone, tick, modem, lain }) {
   const [rows, setRows] = useState(['']);
   const [out, setOut] = useState(false);
 
   useEffect(() => {
     let alive = true;
+    let stopMusic = null;
     const timers = [];
     const wait = (ms) => new Promise((res) => { timers.push(setTimeout(res, ms)); });
     const R = [''];
@@ -2974,10 +3041,46 @@ function WakeIntro({ onDone, tick, modem }) {
     };
 
     (async () => {
-      const door = rpick(['matrix', 'dialup', 'login', 'vhs', 'post', 'tuner', 'ghost', 'lain']);
+      const door = rpick(['matrix', 'dialup', 'login', 'vhs', 'post', 'tuner', 'ghost', 'lain', 'breach']);
 
-      if (door === 'lain') {
+      if (door === 'breach') {
+        /* an intrusion that lands, cheerfully, in the owner's own shell */
+        await wait(500);
+        await type('$ nmap -p- cyberspace', 34);
+        await wait(500);
+        pushNow('  22/tcp   open  ssh');
+        await wait(200);
+        pushNow('  1987/tcp open  tzm-sh   << unusual');
+        await wait(700);
+        pushNow('');
+        await type('$ exploit --target 1987 --payload reverse-beam', 34);
+        await wait(600);
+        /* the progress bar filling to root */
+        const barW = 24;
+        for (let k = 0; k <= barW; k++) {
+          if (!alive) return;
+          const done = '='.repeat(k);
+          const todo = ' '.repeat(barW - k);
+          put(`[${done}${todo}] ${Math.round((k / barW) * 100)}%`);
+          if (tick) tick();
+          await wait(70);
+        }
+        await wait(300);
+        pushNow('[+] buffer aligned. no ASLR on a tube this old.');
+        await wait(500);
+        pushNow('[+] shell popped. uid=0(root)');
+        await wait(700);
+        pushNow('');
+        await type('# whoami', 60);
+        await wait(600);
+        pushNow('tzm');
+        await wait(500);
+        pushNow('# ...wait. this was your machine all along.');
+        await wait(1400);
+
+      } else if (door === 'lain') {
         /* Serial Experiments Lain: present day, present time */
+        if (lain) stopMusic = lain();
         await wait(900);
         await type('present day...', 62);
         await wait(650);
@@ -3104,7 +3207,11 @@ function WakeIntro({ onDone, tick, modem }) {
       if (alive) onDone();
     })();
 
-    return () => { alive = false; timers.forEach(clearTimeout); };
+    return () => {
+      alive = false;
+      timers.forEach(clearTimeout);
+      if (stopMusic) stopMusic();
+    };
   }, []);
 
   return (
@@ -3972,6 +4079,7 @@ function App() {
               <WakeIntro
                 tick={v.sound ? sound.keyTick : null}
                 modem={v.sound ? sound.modemSound : null}
+                lain={v.sound ? sound.lainTheme : null}
                 onDone={() => setPhase('boot')}
               />
             )}

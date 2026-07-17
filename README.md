@@ -42,7 +42,8 @@ A different opening every visit, all one tap from the shell:
 | **post** | BIOS memory count to 640K, detecting the disk and the guitar |
 | **tuner** | TV static surfing channels until it lands on TZM-TV |
 | **ghost** | *Ghost in the Shell* — "the net is vast and infinite" |
-| **lain** | *Serial Experiments Lain* — "present day, present time" |
+| **lain** | *Serial Experiments Lain* — "present day, present time", over the Duvet melody (sound on) |
+| **breach** | a port scan, an exploit, root shell popped — then `whoami` says `tzm`. it was your machine all along |
 
 ---
 
