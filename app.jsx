@@ -2974,9 +2974,32 @@ function WakeIntro({ onDone, tick, modem }) {
     };
 
     (async () => {
-      const door = rpick(['matrix', 'dialup', 'login', 'vhs', 'post', 'tuner']);
+      const door = rpick(['matrix', 'dialup', 'login', 'vhs', 'post', 'tuner', 'ghost', 'lain']);
 
-      if (door === 'post') {
+      if (door === 'lain') {
+        /* Serial Experiments Lain: present day, present time */
+        await wait(900);
+        await type('present day...', 62);
+        await wait(650);
+        R[R.length - 1] += '   present time.'; sync();
+        if (tick) tick();
+        await wait(1500); await erase(); await wait(450);
+        await type('and you don’t seem to understand.', 40);
+        await wait(1300); await erase(); await wait(400);
+        await type('no matter where you go, everyone is connected.', 36);
+        await wait(1400);
+
+      } else if (door === 'ghost') {
+        /* Ghost in the Shell: the net is vast and infinite */
+        await wait(900);
+        await type('a network dive detected...', 44);
+        await wait(1300); await erase(); await wait(400);
+        await type('your ghost whispers to you.', 44);
+        await wait(1500); await erase(); await wait(500);
+        await type('the net is vast and infinite.', 40);
+        await wait(1400);
+
+      } else if (door === 'post') {
         /* the memory count every PC crawled through before it would boot */
         await wait(500);
         pushNow('TZM-BIOS (C) 1987-2026');
@@ -3707,6 +3730,24 @@ function App() {
       out = { kind: 'text', text: 'what? make it yourself.', warn: true };
     } else if (c === 'ping tzm' || c === 'ping thezakman') {
       out = { kind: 'text', text: 'tzm is online. tzm is always online. online since 1987, remember.' };
+    } else if (c === 'lain' || c === 'wired' || c === 'the wired' || c === "let's all love lain" || c === 'lets all love lain') {
+      out = { kind: 'pre', text: [
+        '        close the world.',
+        '         open the nExt.',
+        '',
+        "and you don't seem to understand.",
+        'in the wired, no matter where you are, everyone is connected.',
+        'you are here. so am I. so is everyone. that was always the point.',
+      ].join('\n'), tail: "let's all love lain." };
+    } else if (c === 'ghost' || c === 'dive' || c === 'ghost in the shell') {
+      out = { kind: 'pre', text: [
+        '        .--.',
+        '       ( >o< )   your ghost whispers to you.',
+        "        `-><-'",
+        '',
+        'the net is vast and infinite. a dive returns what you',
+        'bring to it — you brought curiosity. that will do.',
+      ].join('\n'), tail: 'jacking out. remember: the ghost is yours, not the shell.' };
     } else if (c === 'coffee' || c === 'cafe' || c === 'café') {
       out = { kind: 'pre', text: '      ) )\n     ( (\n   .______.\n   |      |]\n   \\      /\n    `----´', tail: 'brewing... done. gpu overclocked.' };
     } else if (c === 'cat /etc/passwd') {
