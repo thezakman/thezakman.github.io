@@ -167,6 +167,32 @@ function DeadPixels({ chance }) {
   );
 }
 
+/* Settled dust on the glass: specks that caught the phosphor and never
+   got wiped. Static — dirt that crawls reads as noise — but scattered
+   fresh every session, and faint, so it's texture not a constellation.
+   Held in a ref so it doesn't jump around as the terminal re-renders. */
+function Dust({ n = 24 }) {
+  const specks = useRef(null);
+  if (!specks.current) {
+    specks.current = Array.from({ length: n }, () => ({
+      x: rnd(2, 98),
+      y: rnd(3, 97),
+      s: rnd(0.6, 2.2),
+      o: rnd(0.04, 0.16),
+    }));
+  }
+  return (
+    <div className="dust" aria-hidden="true">
+      {specks.current.map((d, i) => (
+        <span
+          key={i}
+          style={{ left: `${d.x}%`, top: `${d.y}%`, width: d.s, height: d.s, opacity: d.o }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function rndHex(len = 8) {
   const c = '0123456789ABCDEF';
   let s = '';
@@ -2948,9 +2974,50 @@ function WakeIntro({ onDone, tick, modem }) {
     };
 
     (async () => {
-      const door = rpick(['matrix', 'dialup', 'login', 'vhs']);
+      const door = rpick(['matrix', 'dialup', 'login', 'vhs', 'post', 'tuner']);
 
-      if (door === 'matrix') {
+      if (door === 'post') {
+        /* the memory count every PC crawled through before it would boot */
+        await wait(500);
+        pushNow('TZM-BIOS (C) 1987-2026');
+        await wait(350);
+        R.push('Memory Test : ');
+        sync();
+        for (let k = 0; k <= 640; k += 64) {
+          if (!alive) return;
+          R[R.length - 1] = `Memory Test : ${k}K`;
+          sync();
+          if (tick) tick();
+          await wait(90);
+        }
+        R[R.length - 1] = 'Memory Test : 640K OK';
+        sync();
+        await wait(500);
+        pushNow('Detecting Primary Master ... TZM-DISK 40MB');
+        await wait(500);
+        pushNow('Detecting Guitar ... /dev/strat');
+        await wait(700);
+
+      } else if (door === 'tuner') {
+        /* channel-surfing static that lands on this station (ASCII only —
+           the block glyphs aren't monospace in VT323 and would shear) */
+        await wait(500);
+        const grain = ' .:-=+*#%@';
+        for (let f = 0; f < 10; f++) {
+          if (!alive) return;
+          let s = '';
+          for (let i = 0; i < 44; i++) s += grain[(Math.random() * grain.length) | 0];
+          put(s);
+          if (tick) tick();
+          await wait(90);
+        }
+        await wait(200);
+        pushNow('CH 87  ...  no signal');
+        await wait(500);
+        pushNow('CH 88  ...  >> TZM-TV <<  tuning in');
+        await wait(1100);
+
+      } else if (door === 'matrix') {
         await wait(900);
         await type('Wake up...');
         await wait(1100); await erase(); await wait(350);
@@ -3050,24 +3117,35 @@ function Motes() {
        the pointer is a puff of air — grains inside its radius get pushed
        outward and keep the momentum, then settle back to their drift.
        Nothing moves in lockstep; that's the whole point. */
-    const N = 17;
+    const N = 18;
+    /* (re)seed a grain's position, velocity, look and wander rhythm from
+       scratch — called at birth and again if the page is restored from
+       the back/forward cache, so a refresh never shows the same field */
+    const seed = (p) => {
+      p.x = Math.random(); p.y = Math.random();   // normalized 0..1
+      p.vx = rnd(-0.02, 0.02); p.vy = rnd(-0.02, 0.008);
+      p.px = rnd(0, 6.3); p.py = rnd(0, 6.3);
+      p.fx = rnd(0.06, 0.26); p.fy = rnd(0.06, 0.26);
+      p.wander = rnd(0.03, 0.07);
+      p.size = rnd(1, 2.6);
+      p.el.style.width = p.el.style.height = `${p.size}px`;
+      /* faint but visibly there, and every grain a different faint — a
+         wide random spread so no two catch the light the same way */
+      p.el.style.opacity = rnd(0.07, 0.2).toFixed(3);
+      return p;
+    };
     const parts = Array.from({ length: N }, () => {
       const el = document.createElement('span');
       el.className = 'mote-dot';
-      const size = rnd(1, 2.4);
-      el.style.width = el.style.height = `${size}px`;
-      el.style.opacity = rnd(0.05, 0.13).toFixed(3);
       host.appendChild(el);
-      return {
-        el, size,
-        x: Math.random(), y: Math.random(),   // normalized 0..1
-        vx: rnd(-0.01, 0.01), vy: rnd(-0.012, 0.004),
-        /* its own wander rhythm, so no two share a path */
-        px: rnd(0, 6.3), py: rnd(0, 6.3),
-        fx: rnd(0.05, 0.22), fy: rnd(0.05, 0.22),
-        wander: rnd(0.008, 0.02),
-      };
+      return seed({ el });
     });
+
+    /* bfcache restore: the browser froze the whole page and handed it
+       back untouched, so the dust would sit exactly where it was. Re-seed
+       on persisted pageshow to keep every refresh a new field. */
+    const onShow = (e) => { if (e.persisted) parts.forEach(seed); };
+    window.addEventListener('pageshow', onShow);
 
     let w = host.clientWidth || 1, h = host.clientHeight || 1;
     const ro = new ResizeObserver(() => { w = host.clientWidth || 1; h = host.clientHeight || 1; });
@@ -3095,9 +3173,10 @@ function Motes() {
       const aspect = w / h;
 
       for (const p of parts) {
-        /* slow self-wander: a gentle sine acceleration, unique per grain */
+        /* self-wander: a gentle sine acceleration, unique per grain, plus
+           a faint upward bias — dust rises in the tube's warmth */
         let ax = Math.sin(t * p.fx + p.px) * p.wander;
-        let ay = Math.cos(t * p.fy + p.py) * p.wander - 0.004;  // faint rise
+        let ay = Math.cos(t * p.fy + p.py) * p.wander - 0.009;
 
         /* the puff: push radially away, strongest at the centre, and it
            fades with distance so the edge of the gust is soft */
@@ -3114,8 +3193,10 @@ function Motes() {
           }
         }
 
-        p.vx = (p.vx + ax * dt) * 0.90;   // damping, so gusts decay
-        p.vy = (p.vy + ay * dt) * 0.90;
+        /* light damping: enough to let gusts decay, loose enough that the
+           idle drift stays alive and visible instead of stalling to a stop */
+        p.vx = (p.vx + ax * dt) * 0.955;
+        p.vy = (p.vy + ay * dt) * 0.955;
         p.x += p.vx * dt;
         p.y += p.vy * dt;
 
@@ -3133,6 +3214,7 @@ function Motes() {
       cancelAnimationFrame(raf);
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerleave', onLeave);
+      window.removeEventListener('pageshow', onShow);
       ro.disconnect();
       parts.forEach((p) => p.el.remove());
     };
@@ -3597,6 +3679,34 @@ function App() {
       out = { kind: 'text', text: '42. next question.' };
     } else if (c === 'xyzzy') {
       out = { kind: 'text', text: 'nothing happens. (that IS the reference.)' };
+    } else if (c === 'sudo rm -rf / --no-preserve-root') {
+      out = { kind: 'text', text: 'access denied by the ghost in this tube. it has seen what that does. it will not watch it again.', warn: true };
+    } else if (c === 'whoami --real' || c === 'whoareyou') {
+      out = { kind: 'text', text: 'a guest, at a terminal, in Rio, at ' + nowStr().slice(11, 19) + '. beyond that, your guess is as good as mine.' };
+    } else if (c === 'ping google' || c === 'ping google.com' || c === 'ping 8.8.8.8') {
+      out = { kind: 'text', text: "the year is 1987. google won't exist for eleven more years. try again then.", warn: true };
+    } else if (c === 'sl -la' || c === 'ls -sl') {
+      out = { kind: 'text', text: "you typed the train AND the list. the tube doesn't know what you want. honestly, neither do you." };
+    } else if (c === 'konami' || c === 'up up down down left right left right b a') {
+      setTweak('phosphor', 'magenta');
+      degauss();
+      out = { kind: 'text', text: '30 lives granted. tube switched to a phosphor that never shipped. cheat mode.' };
+    } else if (c === 'fortune') {
+      out = { kind: 'text', text: rpick([
+        'a bug you can reproduce is a bug already half-fixed.',
+        'the best exploit is the one nobody thought to look for.',
+        'curiosity did not kill the cat. 17527 photos say it thrived.',
+        'ship the demo. the tube runs warmest when someone is watching.',
+        'every blackbox is a whitebox to a patient enough attacker.',
+      ]) };
+    } else if (c === 'moon' || c === 'phase') {
+      out = { kind: 'text', text: rpick(['🌑 new', '🌒 waxing crescent', '🌓 first quarter', '🌔 waxing gibbous', '🌕 full', '🌖 waning gibbous', '🌗 last quarter', '🌘 waning crescent']) + ' — as seen from a tube with no window.' };
+    } else if (c === 'sudo make me a sandwich') {
+      out = { kind: 'text', text: 'okay. (you said the magic word.) 🥪' };
+    } else if (c === 'make me a sandwich') {
+      out = { kind: 'text', text: 'what? make it yourself.', warn: true };
+    } else if (c === 'ping tzm' || c === 'ping thezakman') {
+      out = { kind: 'text', text: 'tzm is online. tzm is always online. online since 1987, remember.' };
     } else if (c === 'coffee' || c === 'cafe' || c === 'café') {
       out = { kind: 'pre', text: '      ) )\n     ( (\n   .______.\n   |      |]\n   \\      /\n    `----´', tail: 'brewing... done. gpu overclocked.' };
     } else if (c === 'cat /etc/passwd') {
@@ -3791,7 +3901,7 @@ function App() {
           {/* the glass itself: 30 years of dust, fingerprints and dead subpixels */}
           {v.grime && (
             <>
-              <div className="dust"></div>
+              <Dust />
               <div className="smudge"></div>
               <DeadPixels chance={v.deadpix} />
             </>

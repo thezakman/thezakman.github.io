@@ -329,6 +329,7 @@ body {
   background: radial-gradient(ellipse at center, var(--bg) 55%, #000 115%);
 }
 
+
 /* edge shadow (CRT curvature darkening) */
 .crt.curved .screen::before {
   content: '';
@@ -1007,12 +1008,12 @@ body {
   transition: opacity 0.5s ease;
   /* clipped to the emission cone: a grain only shows where the tube's
      light actually reaches, so the dust reads as floating in the glow */
-  -webkit-mask-image: radial-gradient(52% 56% at 50% 47%, #000 34%, transparent 82%);
-  mask-image: radial-gradient(52% 56% at 50% 47%, #000 34%, transparent 82%);
+  -webkit-mask-image: radial-gradient(64% 68% at 50% 47%, #000 40%, transparent 88%);
+  mask-image: radial-gradient(64% 68% at 50% 47%, #000 40%, transparent 88%);
 }
 .motes.room .mote-dot {
-  background: color-mix(in oklab, var(--glow) 58%, #fff);
-  box-shadow: 0 0 3px color-mix(in oklab, var(--glow) 30%, transparent);
+  background: color-mix(in oklab, var(--glow) 55%, #fff);
+  box-shadow: 0 0 4px color-mix(in oklab, var(--glow) 40%, transparent);
 }
 /* tube off, light off — the dust is still there, you just can't see it */
 .crt.powered-off .motes.room { opacity: 0.1; }
@@ -1046,35 +1047,19 @@ body {
 /* ====================== GLASS: DUST, SMUDGES, DEAD PIXELS ======================
    All static — grime that crawls reads as noise, not as dirt. */
 
-/* settled dust catching the phosphor light */
+/* settled dust catching the phosphor light — specks scattered fresh
+   each session in JS (see the Dust component), faint and static */
 .dust {
   position: absolute; inset: 0;
   pointer-events: none;
   z-index: 12;
   mix-blend-mode: screen;
-  opacity: 0.55;
-  background-repeat: no-repeat;
-  background-image:
-    radial-gradient(1.5px 1.5px at 12% 22%, rgba(255,255,255,0.42), transparent),
-    radial-gradient(1px 1px   at 27% 8%,   rgba(255,255,255,0.3),  transparent),
-    radial-gradient(2px 2px   at 41% 63%,  rgba(255,255,255,0.28), transparent),
-    radial-gradient(1px 1px   at 55% 17%,  rgba(255,255,255,0.34), transparent),
-    radial-gradient(1.5px 1.5px at 68% 44%, rgba(255,255,255,0.26), transparent),
-    radial-gradient(1px 1px   at 74% 79%,  rgba(255,255,255,0.32), transparent),
-    radial-gradient(2.5px 2.5px at 88% 31%, rgba(255,255,255,0.2), transparent),
-    radial-gradient(1px 1px   at 92% 68%,  rgba(255,255,255,0.3),  transparent),
-    radial-gradient(1.5px 1.5px at 6% 54%, rgba(255,255,255,0.24), transparent),
-    radial-gradient(1px 1px   at 19% 88%,  rgba(255,255,255,0.28), transparent),
-    radial-gradient(2px 2px   at 33% 37%,  rgba(255,255,255,0.18), transparent),
-    radial-gradient(1px 1px   at 47% 92%,  rgba(255,255,255,0.3),  transparent),
-    radial-gradient(1.5px 1.5px at 61% 27%, rgba(255,255,255,0.22), transparent),
-    radial-gradient(1px 1px   at 79% 12%,  rgba(255,255,255,0.34), transparent),
-    radial-gradient(2px 2px   at 84% 57%,  rgba(255,255,255,0.16), transparent),
-    radial-gradient(1px 1px   at 96% 43%,  rgba(255,255,255,0.26), transparent),
-    radial-gradient(1px 1px   at 15% 71%,  rgba(255,255,255,0.24), transparent),
-    radial-gradient(1.5px 1.5px at 38% 5%, rgba(255,255,255,0.2),  transparent),
-    radial-gradient(1px 1px   at 52% 49%,  rgba(255,255,255,0.22), transparent),
-    radial-gradient(1px 1px   at 66% 85%,  rgba(255,255,255,0.26), transparent);
+}
+.dust span {
+  position: absolute;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 1.5px rgba(255, 255, 255, 0.5);
 }
 
 /* fingerprints and the ghost of a bad cleaning job */
