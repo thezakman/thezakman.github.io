@@ -821,6 +821,84 @@ body {
   .paint-canvas { font-size: 12px; }
 }
 
+/* ====================== WINDOWS 95 ======================
+   The only two screens on this site allowed to abandon the phosphor:
+   the boot that never finished, and the blue it always finished in.
+   Scanlines and glass stay on top — it's still running on this tube. */
+
+.win95 {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace;
+}
+.win-boot {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 26px;
+  color: #fff;
+}
+.win-logo {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.4);
+}
+.win-logo .win-r { font-size: 14px; vertical-align: super; }
+.win-start { font-size: 15px; opacity: 0.85; animation: cursorblink 1.2s steps(2, end) infinite; }
+
+.win-bsod {
+  position: absolute;
+  inset: 0;
+  background: #0808a8;
+  color: #fff;
+  padding: 10% 12%;
+  font-size: 15px;
+  line-height: 1.7;
+}
+.win-bsod p { margin: 0 0 18px; }
+.bsod-title {
+  display: block;
+  width: max-content;
+  margin: 0 auto 26px;
+  background: #a8a8a8;
+  color: #0808a8;
+  font-weight: 700;
+  padding: 1px 14px;
+  letter-spacing: 0.06em;
+}
+.bsod-continue { text-align: center; }
+
+@media (max-width: 600px) {
+  .win-logo { font-size: 22px; }
+  .win-bsod { padding: 12% 7%; font-size: 12px; }
+}
+
+/* ====================== THE SL TRAIN ====================== */
+
+.train { overflow: hidden; }
+.train-inner {
+  font-family: 'JetBrains Mono', 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  line-height: 1.15;
+  white-space: pre;
+  margin: 4px 0 6px;
+  width: max-content;
+  animation: train-run 7s linear forwards;
+}
+@keyframes train-run {
+  from { transform: translateX(85vw); }
+  to   { transform: translateX(-110%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .train-inner { animation: none; transform: none; }
+}
+
 /* ====================== THE WHISPER ======================
    Text on a monitor that is switched off. It sits below the scanline and
    glass layers so the tube still treats it as a picture — the one thing
@@ -918,7 +996,7 @@ body {
 }
 @keyframes mote-drift {
   0%   { transform: translate3d(0, 0, 0); }
-  50%  { opacity: calc(var(--mo, 0.1) * 1.8); }
+  50%  { opacity: calc(var(--mo, 0.1) * 1.6); }
   100% { transform: translate3d(var(--mdx, 10px), var(--mdy, -14px), 0); }
 }
 
@@ -931,12 +1009,14 @@ body {
   inset: 0;
   z-index: 6;
   transition: opacity 0.5s ease;
-  -webkit-mask-image: radial-gradient(56% 62% at 50% 46%, #000 30%, transparent 76%);
-  mask-image: radial-gradient(56% 62% at 50% 46%, #000 30%, transparent 76%);
+  /* clipped to the emission cone: a grain only shows where the tube's
+     light actually reaches, so the dust reads as floating in the glow */
+  -webkit-mask-image: radial-gradient(52% 56% at 50% 47%, #000 34%, transparent 82%);
+  mask-image: radial-gradient(52% 56% at 50% 47%, #000 34%, transparent 82%);
 }
 .motes.room span {
-  background: color-mix(in oklab, var(--glow) 72%, #fff);
-  box-shadow: 0 0 3px color-mix(in oklab, var(--glow) 45%, transparent);
+  background: color-mix(in oklab, var(--glow) 62%, #fff);
+  box-shadow: 0 0 4px color-mix(in oklab, var(--glow) 50%, transparent);
 }
 /* tube off, light off — the dust is still there, you just can't see it */
 .crt.powered-off .motes.room { opacity: 0.1; }
@@ -957,12 +1037,12 @@ body {
      the room actually gets — one gradient alone reads as a spotlight */
   background:
     radial-gradient(34% 30% at 50% 46%,
-      color-mix(in oklab, var(--glow) 9%, transparent),
+      color-mix(in oklab, var(--glow) 12%, transparent),
       transparent 72%),
-    radial-gradient(52% 48% at 50% 48%,
-      color-mix(in oklab, var(--glow) 6%, transparent),
-      transparent 80%);
-  filter: blur(60px);
+    radial-gradient(54% 50% at 50% 48%,
+      color-mix(in oklab, var(--glow) 8%, transparent),
+      transparent 82%);
+  filter: blur(58px);
   opacity: var(--emission, 0.8);
   transition: opacity 0.4s ease;
 }
@@ -1304,11 +1384,12 @@ body {
   .gate-power, .gate-hint { animation: none; opacity: 0.45; }
 }
 
-/* the film's opening line, waiting alone on the dark tube */
+/* the opening lines, waiting alone on the dark tube */
 .wake-intro {
   padding: 13% 6% 0;
   min-height: 1.4em;
 }
+.wake-row { min-height: 1.4em; line-height: 1.4; }
 
 /* The exit isn't a fade — the signal carrying the line tears. Hard cuts
    (steps) instead of tweens: sync loss doesn't interpolate. */
@@ -1641,6 +1722,149 @@ body {
   font-size: 11px;
 }
 
+/* ====================== MAN PAGE ======================
+   man(1) typography: bold caps section heads flush left, body indented
+   one tab stop, header and footer rails. The content is the résumé;
+   the format is the joke that makes it land. */
+
+.man {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  line-height: 1.65;
+  max-width: 960px;
+}
+.man-head, .man-foot {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+  opacity: 0.5;
+}
+
+/* LANG= switch: environment variable as UI, the way a man page would */
+.man-lang {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin-top: 8px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+.man-lang button {
+  font: inherit;
+  background: none;
+  border: 0;
+  padding: 1px 6px;
+  color: var(--fg);
+  opacity: 0.5;
+  cursor: pointer;
+  text-shadow: inherit;
+}
+.man-lang button:hover { opacity: 0.85; text-decoration: underline; }
+.man-lang button.on {
+  opacity: 1;
+  font-weight: 700;
+  background: color-mix(in oklab, var(--fg) 82%, var(--bg));
+  color: var(--bg);
+  text-shadow: none;
+}
+.man-lang button:focus-visible { outline: 1px solid var(--fg); outline-offset: 1px; }
+.man-foot { margin-top: 18px; }
+.man-h {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin: 15px 0 4px;
+  color: color-mix(in oklab, var(--fg) 60%, white 40%);
+}
+.man-p {
+  margin: 0 0 9px;
+  padding-left: 2.4ch;
+}
+.man-clients {
+  opacity: 0.55;
+  font-size: 12px;
+}
+.man-opts {
+  display: grid;
+  grid-template-columns: minmax(12ch, max-content) 1fr;
+  gap: 2px 18px;
+  padding-left: 2.4ch;
+  margin-bottom: 9px;
+}
+.man-opts span:nth-child(odd) {
+  color: color-mix(in oklab, var(--fg) 60%, white 40%);
+  font-weight: 700;
+}
+.man-link, .man-xref {
+  font: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: color-mix(in oklab, var(--fg) 55%, white 45%);
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  text-shadow: inherit;
+}
+.man-link:hover, .man-xref:hover,
+.man-link:focus-visible, .man-xref:focus-visible {
+  text-decoration: underline;
+  outline: none;
+}
+.man-end { margin-top: 6px; }
+
+/* ====================== THE STORY LINK ======================
+   The short about's exit sign: inverse video like the f-key strip, so
+   it reads as the one pressable thing in the paragraph. */
+
+.story-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 8px;
+}
+/* leading the about block instead of trailing it */
+.story-row.story-first { margin-top: 2px; margin-bottom: 10px; }
+.story-link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--fg);
+  cursor: pointer;
+  text-shadow: var(--text-shadow);
+}
+.story-arrow { animation: cursorblink 1.1s steps(2, end) infinite; }
+.story-label {
+  background: color-mix(in oklab, var(--fg) 82%, var(--bg));
+  color: var(--bg);
+  text-shadow: none;
+  font-weight: 700;
+  padding: 1px 12px 2px;
+  letter-spacing: 0.04em;
+  transition: background 80ms linear;
+}
+.story-link:hover .story-label,
+.story-link:focus-visible .story-label {
+  background: color-mix(in oklab, var(--fg) 100%, white 20%);
+  box-shadow: 0 0 14px color-mix(in oklab, var(--glow) 55%, transparent);
+}
+.story-link:focus-visible { outline: none; }
+.story-tail { opacity: 0.5; }
+@media (prefers-reduced-motion: reduce) {
+  .story-arrow { animation: none; }
+}
+
+@media (max-width: 600px) {
+  .man { font-size: 11px; }
+  .man-p, .man-opts { padding-left: 1ch; }
+  .man-opts { grid-template-columns: 1fr; gap: 0; }
+  .man-opts span:nth-child(even) { margin-bottom: 6px; opacity: 0.75; }
+}
+
 /* ====================== BEER & DONATE ====================== */
 
 .beer {
@@ -1650,6 +1874,87 @@ body {
   color: color-mix(in oklab, var(--fg) 80%, white 20%);
   margin: 6px 0;
 }
+.donate-row {
+  display: flex;
+  align-items: center;
+  gap: 34px;
+  flex-wrap: wrap;
+}
+.donate-txt { flex: 1; min-width: 280px; max-width: 640px; }
+.donate-txt p { margin: 2px 0 8px; }
+.beer-log { font-size: 0.8em; letter-spacing: 0.04em; }
+
+/* the tap list: a bar menu set like a terminal directory listing */
+.tap-head {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  opacity: 0.5;
+  margin-top: 10px;
+}
+.tap-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0 10px;
+}
+.tap-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 3px 8px;
+  margin: 0 -8px;
+  color: var(--fg);
+  text-decoration: none;
+  transition: background 80ms linear;
+}
+.tap-row:hover, .tap-row:focus-visible {
+  background: color-mix(in oklab, var(--fg) 14%, transparent);
+  outline: none;
+}
+.tap-dots {
+  flex: 1;
+  border-bottom: 2px dotted color-mix(in oklab, var(--fg) 32%, transparent);
+  transform: translateY(-0.28em);
+}
+.tap-price { font-weight: 700; }
+.tap-pour {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  background: color-mix(in oklab, var(--fg) 82%, var(--bg));
+  color: var(--bg);
+  text-shadow: none;
+  padding: 1px 9px;
+  opacity: 0.85;
+  transition: background 80ms linear;
+}
+.tap-row:hover .tap-pour {
+  background: color-mix(in oklab, var(--fg) 100%, white 20%);
+  opacity: 1;
+  box-shadow: 0 0 12px color-mix(in oklab, var(--glow) 50%, transparent);
+}
+
+/* ====================== WEATHER ====================== */
+
+.weather {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  flex-wrap: wrap;
+}
+.wx-art {
+  font-family: 'JetBrains Mono', 'IBM Plex Mono', monospace;
+  font-size: 14px;
+  line-height: 1.2;
+  margin: 4px 0;
+  color: color-mix(in oklab, var(--fg) 80%, white 20%);
+}
+.wx-info { font-size: 0.95em; line-height: 1.6; }
+.wx-place { font-weight: 700; }
+.wx-main { font-size: 1.15em; }
+.wx-src { font-size: 0.75em; letter-spacing: 0.04em; }
 
 .btn {
   display: inline-flex;

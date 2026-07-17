@@ -18,7 +18,7 @@ const SOCIALS = [
   { glyph: '▶', name: 'steam',      handle: 'thezakman87',    url: 'http://steamcommunity.com/id/thezakman87',                 kb: '888K', mtime: 'Dec 24  2022' },
 ];
 
-const CMDS = ['about', 'social', 'donate', 'contact', 'neofetch', 'paint', 'demo', 'date', 'clear'];
+const CMDS = ['about', 'social', 'donate', 'contact', 'neofetch', 'paint', 'demo', 'weather', 'clear'];
 
 /* The function-key strip every DOS-era file manager ended with. The digit
    is real: F1-F9 fire it, and so does Alt+digit, since macOS eats bare
@@ -30,6 +30,7 @@ const FKEYS = CMDS.map((cmd, i) => ({ n: i + 1, cmd }));
    blindly. */
 const HELP = [
   ['about',      'who you are talking to'],
+  ['man tzm',    'the whole story, typeset properly'],
   ['social',     'where else I exist'],
   ['ls -la',     'the same, as symlinks'],
   ['donate',     'buy me a beer'],
@@ -39,6 +40,7 @@ const HELP = [
   ['demo',       "a procedural effect — 'demo list'"],
   ['screensaver','after dark, hold the toasters'],
   ['phosphor',   'swap the tube: phosphor amber'],
+  ['weather',    "the sky over this machine's desk"],
   ['date',       'the clock on my desk'],
   ['degauss',    'fire the coil'],
   ['sound',      'let the flyback sing'],
@@ -49,11 +51,12 @@ const HELP = [
 /* Everything tab-completable, including what the button bar doesn't show. */
 const COMPLETIONS = [
   'about', 'beer', 'cats', 'clear', 'contact', 'date', 'degauss', 'demo',
-  'demo list', 'donate', 'exit', 'fx', 'hardware', 'help', 'irc', 'ls', 'ls -la', 'matrix',
-  'mute', 'neofetch', 'paint', 'phosphor', 'phosphor amber', 'phosphor cyan',
+  'cat about.txt', 'demo list', 'donate', 'exit', 'fx', 'hardware', 'help', 'irc',
+  'ls', 'ls -la', 'man', 'man tzm', 'man tzm --en', 'man tzm --pt', 'matrix',
+  'mute', 'neofetch', 'paint', 'phosphor', 'phosphor amber', 'phosphor blue', 'phosphor cyan',
   'phosphor green', 'phosphor magenta', 'phosphor white', 'poweroff',
   'saver', 'screensaver', 'shutdown', 'social', 'sound', 'specs',
-  'unmute', 'whoami',
+  'unmute', 'weather', 'whoami',
 ];
 
 /* ==================== helpers ==================== */
@@ -468,7 +471,54 @@ function useCrtSound(enabled, volume) {
     o.start(t); o.stop(t + 0.055);
   }, []);
 
-  return { setPowered, degaussSound, powerOffSound, powerOnSound, keyTick, typeTick, clickSound };
+  /* a 33.6k handshake, abridged: DTMF dial, answer tone, warble, hiss.
+     The real one took nine seconds; nostalgia gets two. */
+  const modemSound = useCallback(() => {
+    const a = rig.current;
+    if (!a) return;
+    const { ctx, master } = a;
+    a.ctx.resume();
+    const t = ctx.currentTime;
+    const tone = (f1, f2, start, dur, lvl) => {
+      for (const f of [f1, f2]) {
+        if (!f) continue;
+        const o = ctx.createOscillator();
+        o.type = 'sine';
+        o.frequency.value = f;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, start);
+        g.gain.linearRampToValueAtTime(lvl, start + 0.015);
+        g.gain.setValueAtTime(lvl, start + dur - 0.02);
+        g.gain.linearRampToValueAtTime(0.0001, start + dur);
+        o.connect(g); g.connect(master);
+        o.start(start); o.stop(start + dur);
+      }
+    };
+    /* dialing */
+    tone(770, 1336, t, 0.09, 0.045);
+    tone(852, 1209, t + 0.15, 0.09, 0.045);
+    tone(697, 1477, t + 0.30, 0.09, 0.045);
+    /* answer tone, then the carriers negotiating */
+    tone(2100, 0, t + 0.55, 0.4, 0.03);
+    tone(1200, 2250, t + 1.05, 0.5, 0.025);
+    /* and the hiss of an agreement being reached */
+    const len = Math.floor(ctx.sampleRate * 0.7);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * 0.5;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 1800; bp.Q.value = 0.6;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t + 1.5);
+    g.gain.linearRampToValueAtTime(0.045, t + 1.6);
+    g.gain.linearRampToValueAtTime(0.0001, t + 2.2);
+    src.connect(bp); bp.connect(g); g.connect(master);
+    src.start(t + 1.5);
+  }, []);
+
+  return { setPowered, degaussSound, powerOffSound, powerOnSound, keyTick, typeTick, clickSound, modemSound };
 }
 
 /* ==================== type-on hook ==================== */
@@ -642,6 +692,392 @@ function NeofetchBlock() {
     </div>
   );
 }
+
+/* ==================== man tzm ====================
+   The long-form about, typeset the only way a terminal ever shipped a
+   biography. Ships in both of the man's languages: English by default —
+   the rest of the OS speaks it — with the header switch (or
+   `man tzm --pt`) flipping to Portuguese. */
+
+const CLIENTS = [
+  'Apple', 'Ambev', 'Anitta', 'Artplan', 'BBB', 'Blender', 'Bradesco',
+  'CCXP', 'Cinemark', 'Coca-Cola', 'GNT', 'Globosat', 'Hak5', 'HBO',
+  'Kopenhagen', 'Microsoft', 'Rock in Rio', 'Shell', 'Sony', 'Telecine',
+  'TIM', 'UFC', 'Universal', 'Warner',
+];
+
+const Hi = ({ children }) => <span className="hi">{children}</span>;
+
+const MAN_TXT = {
+  pt: {
+    name: <>
+      <Hi>tzm</Hi>, thezakman — Pedro {'“'}TheZakMan{'”'} Araujo.
+      Especialista em Cyber Security; mais de uma década entre tecnologia,
+      pesquisa, criatividade e segurança ofensiva.
+    </>,
+    syn: <>
+      tzm [--web] [--api] [--mobile] [--ai] [--forensics] [--vuln-research] {'<alvo>'}<br />
+      tzm --design | --music | --3d  <span className="dim">(legado desde 2016 — nunca desinstalado)</span>
+    </>,
+    desc: [
+      <>Atuação principal em <Hi>Web Application Security</Hi>, com forte
+      especialização em avaliações <Hi>blackbox</Hi> no modelo{' '}
+      <Hi>Zero to Hero</Hi>: o trabalho começa sem qualquer conhecimento
+      prévio sobre o cliente — infraestrutura, arquitetura, tecnologias ou
+      controles internos. A partir de uma superfície externa aparentemente
+      limitada, todo o processo de reconhecimento, mapeamento e exploração é
+      conduzido para entender como cada componente funciona, como se conecta e
+      onde pode falhar.</>,
+      <>O diferencial está em encontrar caminhos de ataque que não são
+      imediatamente visíveis: vulnerabilidades técnicas, erros de
+      configuração, falhas de controle de acesso, exposição de serviços,
+      comportamentos inesperados, lógica de negócio. Uma brecha aparentemente
+      simples, encadeada, pode terminar em servidores, ambientes internos,
+      sistemas restritos ou informações altamente sensíveis.</>,
+      <>Mais do que apontar vulnerabilidades isoladas, o objetivo é demonstrar
+      até onde um atacante externo chegaria partindo de praticamente zero
+      contexto. Também: <Hi>APIs</Hi>, <Hi>Mobile Security</Hi>,{' '}
+      <Hi>Inteligência Artificial</Hi>, <Hi>Forense Digital</Hi> e{' '}
+      <Hi>Vulnerability Research</Hi> — avaliações técnicas, pesquisas
+      independentes, provas de conceito e ferramentas próprias.</>,
+    ],
+    opts: [
+      ['--zero-to-hero', 'parte do zero contexto; até onde chega, o relatório conta'],
+      ['--chain', 'encadeia a brecha “simples” até onde ninguém devia chegar'],
+      ['--curiosity', 'sempre ativa. não existe flag para desligar'],
+    ],
+    hist: [
+      <>Por dois anos liderou o pilar de <Hi>Bug Hunting da Telefônica</Hi> —
+      identificação, exploração, validação e mitigação de vulnerabilidades
+      em ambientes de grande escala e alcance global.</>,
+      <>Um dos idealizadores do <Hi>CTF-BR</Hi>, projeto criado para fortalecer,
+      conectar e dar visibilidade à comunidade brasileira de segurança
+      ofensiva. Presença constante em CTFs, pesquisas e iniciativas de
+      compartilhamento de conhecimento técnico.</>,
+      <>Contribuições em ferramentas amplamente usadas pela comunidade —{' '}
+      <Hi>GEF</Hi>, <Hi>ShortScan</Hi>, <Hi>Nuclei</Hi>, <Hi>USB Rubber Ducky</Hi> —
+      além de ferramentas, pesquisas e projetos open source próprios.</>,
+    ],
+    root: [
+      <>Antes da segurança, a trajetória foi construída na criatividade:
+      formado em <Hi>Desenho Industrial</Hi>, anos como designer
+      multidisciplinar, artista gráfico, animador e finalizador digital —
+      direção de arte, ilustração, retoque, motion graphics, animação, 3D,
+      VFX e finalização.</>,
+      <>Criação, produção e entrega de conteúdo <Hi>em tempo real</Hi> em
+      grandes eventos — <Hi>Rock in Rio 2019</Hi> e <Hi>Game XP</Hi> —
+      ambientes que exigem agilidade, precisão e improviso sob pressão. E a
+      música sempre presente: videoclipes, capas de álbuns, identidades
+      visuais e projetos para artistas.</>,
+      <>Essa fase não ficou para trás. Ela segue presente na forma de observar
+      detalhes, organizar informação, desenvolver ferramentas, estruturar
+      pesquisas e enxergar possibilidades que a abordagem convencional não
+      percebe.</>,
+    ],
+    clientsTail: '— entre muitos outros.',
+    phil: [
+      <>No design, a busca era construir imagens que causassem impacto. Na
+      segurança ofensiva, é encontrar aquilo que ninguém deveria conseguir
+      enxergar. Nos dois casos, o trabalho começa no mesmo lugar:{' '}
+      <Hi>curiosidade</Hi>. Curioso demais — desmontar ideias, investigar
+      comportamentos, entender como as coisas foram construídas e descobrir o
+      que existe além do caminho óbvio.</>,
+      <>De artes visuais a vulnerabilidades: <Hi>posso te ajudar</Hi>.</>,
+    ],
+  },
+  en: {
+    name: <>
+      <Hi>tzm</Hi>, thezakman — Pedro {'“'}TheZakMan{'”'} Araujo.
+      Cyber Security specialist; over a decade across technology, research,
+      creativity and offensive security.
+    </>,
+    syn: <>
+      tzm [--web] [--api] [--mobile] [--ai] [--forensics] [--vuln-research] {'<target>'}<br />
+      tzm --design | --music | --3d  <span className="dim">(legacy since 2016 — never uninstalled)</span>
+    </>,
+    desc: [
+      <>Main focus on <Hi>Web Application Security</Hi>, heavily specialized in{' '}
+      <Hi>blackbox</Hi> assessments on the <Hi>Zero to Hero</Hi> model: the work
+      starts with zero prior knowledge of the client — infrastructure,
+      architecture, technologies or internal controls. From an apparently
+      limited external surface, the whole process of reconnaissance, mapping
+      and exploitation is driven to understand how each component works, how it
+      connects, and where it can fail.</>,
+      <>The edge is finding attack paths that are not immediately visible:
+      technical vulnerabilities, misconfigurations, access-control failures,
+      exposed services, unexpected behaviors, business logic. One apparently
+      simple hole, chained, can end in servers, internal environments,
+      restricted systems or highly sensitive information.</>,
+      <>More than pointing at isolated vulnerabilities, the goal is to
+      demonstrate how far an external attacker could get starting from
+      practically zero context. Also: <Hi>APIs</Hi>, <Hi>Mobile Security</Hi>,{' '}
+      <Hi>AI</Hi>, <Hi>Digital Forensics</Hi> and <Hi>Vulnerability Research</Hi> —
+      technical assessments, independent research, proofs of concept and
+      homemade tooling.</>,
+    ],
+    opts: [
+      ['--zero-to-hero', "starts from zero context; how far it goes is the report's job"],
+      ['--chain', 'chains the “simple” hole all the way to where nobody should reach'],
+      ['--curiosity', 'always on. there is no flag to turn it off'],
+    ],
+    hist: [
+      <>For two years led <Hi>Telefônica{"'"}s Bug Hunting pillar</Hi> —
+      identification, exploitation, validation and mitigation of
+      vulnerabilities at global scale.</>,
+      <>One of the founders of <Hi>CTF-BR</Hi>, a project built to strengthen,
+      connect and give visibility to the Brazilian offensive-security
+      community. A constant presence at CTFs, research and knowledge-sharing
+      initiatives.</>,
+      <>Contributions to tools widely used by the security community —{' '}
+      <Hi>GEF</Hi>, <Hi>ShortScan</Hi>, <Hi>Nuclei</Hi>, <Hi>USB Rubber Ducky</Hi> —
+      on top of his own open source tools, research and projects.</>,
+    ],
+    root: [
+      <>Before security, the path was built on creativity: a degree in{' '}
+      <Hi>Industrial Design</Hi> and years as a multidisciplinary designer,
+      graphic artist, animator and digital finisher — art direction,
+      illustration, retouch, motion graphics, animation, 3D, VFX and
+      finishing.</>,
+      <>Real-time content creation and delivery at massive live events —{' '}
+      <Hi>Rock in Rio 2019</Hi> and <Hi>Game XP</Hi> — rooms that demand
+      speed, precision and improvising under pressure. And music, always:
+      music videos, album covers, visual identities and artist projects.</>,
+      <>That phase never got left behind. It lives on in how details get
+      noticed, information gets organized, tools get built, research gets
+      structured — and in seeing possibilities a conventional approach
+      misses.</>,
+    ],
+    clientsTail: '— among many others.',
+    phil: [
+      <>In design, the goal was building images that hit. In offensive
+      security, it is finding what nobody should be able to see. Both jobs
+      start in the same place: <Hi>curiosity</Hi>. Too curious — taking ideas
+      apart, probing behaviors, understanding how things were built and
+      finding what lies past the obvious path.</>,
+      <>From visual arts to vulnerabilities: <Hi>I can help you</Hi>.</>,
+    ],
+  },
+};
+
+function ManPage({ onRun, lang: lang0 }) {
+  const [lang, setLang] = useState(lang0 || 'en');
+  const T = MAN_TXT[lang];
+
+  return (
+    <div className="out man">
+      <div className="man-head"><span>TZM(1)</span><span>User Commands</span><span>TZM(1)</span></div>
+
+      <div className="man-lang" aria-label="manual language">
+        <span className="dim">LANG=</span>
+        <button className={lang === 'en' ? 'on' : ''} onClick={() => setLang('en')}>en</button>
+        <span className="dim">|</span>
+        <button className={lang === 'pt' ? 'on' : ''} onClick={() => setLang('pt')}>pt-br</button>
+      </div>
+
+      <h3 className="man-h">NAME</h3>
+      <p className="man-p">{T.name}</p>
+
+      <h3 className="man-h">SYNOPSIS</h3>
+      <p className="man-p">{T.syn}</p>
+
+      <h3 className="man-h">DESCRIPTION</h3>
+      {T.desc.map((d, i) => <p key={i} className="man-p">{d}</p>)}
+
+      <h3 className="man-h">OPTIONS</h3>
+      <div className="man-opts">
+        {T.opts.map(([flag, what]) => (
+          <React.Fragment key={flag}>
+            <span>{flag}</span><span>{what}</span>
+          </React.Fragment>
+        ))}
+      </div>
+
+      <h3 className="man-h">HISTORY</h3>
+      {T.hist.map((d, i) => <p key={i} className="man-p">{d}</p>)}
+
+      <h3 className="man-h">BEFORE ROOT</h3>
+      <p className="man-p">{T.root[0]}</p>
+      <p className="man-p">{T.root[1]}</p>
+      <p className="man-p man-clients">{CLIENTS.join(' · ')} {T.clientsTail}</p>
+      <p className="man-p">{T.root[2]}</p>
+
+      <h3 className="man-h">PHILOSOPHY</h3>
+      {T.phil.map((d, i) => <p key={i} className="man-p">{d}</p>)}
+
+      <h3 className="man-h">SEE ALSO</h3>
+      <p className="man-p">
+        <a className="man-link" href="https://tzm.ink/" target="_blank" rel="noopener noreferrer">tzm.ink(7)</a>
+        {' · '}
+        <a className="man-link" href="https://github.com/thezakman" target="_blank" rel="noopener noreferrer">github(1)</a>
+        {' · '}
+        <button className="man-xref" onClick={() => onRun('social')}>social(1)</button>
+        {' · '}
+        <button className="man-xref" onClick={() => onRun('contact')}>contact(1)</button>
+        {' · '}
+        <button className="man-xref" onClick={() => onRun('donate')}>donate(1)</button>
+      </p>
+
+      <div className="man-foot"><span>TZM-OS 1.3.37</span><span>1987 – 2026</span><span>TZM(1)</span></div>
+      <div className="man-end dim">(END)</div>
+    </div>
+  );
+}
+
+/* ==================== weather ====================
+   The sky over the desk this tube sits on. Fixed coordinates — Rio —
+   so nothing about the visitor is sent anywhere: the machine is asking
+   about its own window, not yours. Open-Meteo, no key, no tracking. */
+
+const WX_CACHE = { data: null, at: 0 };
+
+const WX_ART = {
+  sun: [
+    '   \\   /   ',
+    '    .-.    ',
+    ' --(   )-- ',
+    "    '-'    ",
+    '   /   \\   ',
+  ],
+  partly: [
+    '   \\  /      ',
+    " _ /''.-.    ",
+    '   \\_(   ).  ',
+    '   /(___(__) ',
+  ],
+  cloud: [
+    '     .--.    ',
+    '  .-(    ).  ',
+    ' (___.__)__) ',
+  ],
+  rain: [
+    '     .--.    ',
+    '  .-(    ).  ',
+    ' (___.__)__) ',
+    "  , , , ,    ",
+    " , , , ,     ",
+  ],
+  storm: [
+    '     .--.    ',
+    '  .-(    ).  ',
+    ' (___.__)__) ',
+    '    _/ _/    ',
+    '   /  /      ',
+  ],
+  fog: [
+    ' _ - _ - _ - ',
+    '  - _ - _ -  ',
+    ' _ - _ - _ - ',
+  ],
+  snow: [
+    '     .--.    ',
+    '  .-(    ).  ',
+    ' (___.__)__) ',
+    '  * * * *    ',
+  ],
+};
+
+function wmoDecode(code) {
+  if (code === 0) return { art: 'sun', label: 'clear sky' };
+  if (code === 1) return { art: 'sun', label: 'mostly clear' };
+  if (code === 2) return { art: 'partly', label: 'partly cloudy' };
+  if (code === 3) return { art: 'cloud', label: 'overcast' };
+  if (code === 45 || code === 48) return { art: 'fog', label: 'fog on the glass' };
+  if (code >= 51 && code <= 57) return { art: 'rain', label: 'drizzle' };
+  if (code >= 61 && code <= 67) return { art: 'rain', label: 'rain' };
+  if (code >= 71 && code <= 77) return { art: 'snow', label: 'snow (in rio?!)' };
+  if (code >= 80 && code <= 82) return { art: 'rain', label: 'showers' };
+  if (code >= 95) return { art: 'storm', label: 'thunderstorm' };
+  return { art: 'cloud', label: 'weather, happening' };
+}
+
+function WeatherBlock() {
+  const [state, setState] = useState(WX_CACHE.data ? 'done' : 'loading');
+  const [wx, setWx] = useState(WX_CACHE.data);
+
+  useEffect(() => {
+    /* ten minutes of cache: the sky doesn't refresh at 60fps */
+    if (WX_CACHE.data && Date.now() - WX_CACHE.at < 600000) return;
+    let alive = true;
+    fetch('https://api.open-meteo.com/v1/forecast?latitude=-22.91&longitude=-43.17&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&timezone=America%2FSao_Paulo')
+      .then((r) => r.json())
+      .then((j) => {
+        if (!alive || !j.current) throw new Error('no sky');
+        WX_CACHE.data = j.current;
+        WX_CACHE.at = Date.now();
+        setWx(j.current);
+        setState('done');
+      })
+      .catch(() => { if (alive) setState('err'); });
+    return () => { alive = false; };
+  }, []);
+
+  if (state === 'loading') {
+    return <div className="out dim">polling the sky over rio de janeiro ...</div>;
+  }
+  if (state === 'err' || !wx) {
+    return <div className="out warn">uplink refused: the sky is unreachable right now. try again later.</div>;
+  }
+  const w = wmoDecode(wx.weather_code);
+  return (
+    <div className="out weather">
+      <pre className="wx-art">{WX_ART[w.art].join('\n')}</pre>
+      <div className="wx-info">
+        <div className="wx-place">rio de janeiro <span className="dim">— where this tube sits</span></div>
+        <div className="wx-main"><span className="hi">{Math.round(wx.temperature_2m)}°C</span> · {w.label}</div>
+        <div className="dim">humidity {wx.relative_humidity_2m}% · wind {Math.round(wx.wind_speed_10m)} km/h</div>
+        <div className="dim wx-src">live via open-meteo · fixed coords, nothing about you is sent</div>
+      </div>
+    </div>
+  );
+}
+
+/* ==================== the beer ====================
+   A donate block where the beer is actually carbonated: bubbles rise
+   through the glass for as long as you leave it on screen. */
+
+function BeerFX() {
+  const [, setFrame] = useState(0);
+  const bubbles = useRef(
+    Array.from({ length: 11 }, () => ({ x: 1 + ((Math.random() * 16) | 0), y: (Math.random() * 5) | 0 }))
+  );
+
+  useEffect(() => {
+    if (prefersReducedMotion()) return;
+    const id = setInterval(() => {
+      for (const b of bubbles.current) {
+        b.y -= 1;
+        if (b.y < 0) { b.y = 4; b.x = 1 + ((Math.random() * 16) | 0); }
+      }
+      setFrame((f) => f + 1);
+    }, 420);
+    return () => clearInterval(id);
+  }, []);
+
+  const W = 18;
+  const rows = [0, 1, 2, 3, 4].map(() => new Array(W).fill(' '));
+  for (const b of bubbles.current) {
+    if (rows[b.y]) rows[b.y][b.x] = b.y === 0 ? '.' : 'o';
+  }
+  const glass = (i, handle) => ' |' + rows[i].join('') + '|' + handle;
+  const art = [
+    '  .~~~~~~~~~~~~~~~~~~.',
+    glass(0, '--.'),
+    glass(1, '  |'),
+    glass(2, '  |'),
+    glass(3, "--'"),
+    glass(4, '   '),
+    ' |__________________|  ',
+  ].join('\n');
+
+  return <pre className="beer">{art}</pre>;
+}
+
+/* what the house pours, and what it costs */
+const TAPS = [
+  ['a cold one', 5],
+  ['a sixpack', 15],
+  ['a keg — demo fuel', 50],
+];
 
 /* ==================== status bar ==================== */
 
@@ -2221,6 +2657,86 @@ function PaintStudio({ onExit, click }) {
   );
 }
 
+/* ==================== windows 95 ====================
+   The forbidden boot. It plays out the only way a Windows 95 boot ever
+   did: briefly, and then in blue. The two screens are the only moments
+   this monitor abandons its phosphor entirely — that's the gag. */
+
+function Win95({ onExit }) {
+  const [stage, setStage] = useState('boot');
+
+  useEffect(() => {
+    const id = setTimeout(() => setStage('bsod'), 2800);
+    return () => clearTimeout(id);
+  }, []);
+
+  useEffect(() => {
+    const bail = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (stage === 'boot') setStage('bsod');
+      else onExit();
+    };
+    window.addEventListener('keydown', bail, true);
+    window.addEventListener('pointerdown', bail, true);
+    return () => {
+      window.removeEventListener('keydown', bail, true);
+      window.removeEventListener('pointerdown', bail, true);
+    };
+  }, [stage, onExit]);
+
+  return (
+    <div className="win95">
+      {stage === 'boot' ? (
+        <div className="win-boot">
+          <div className="win-logo">Microsoft<span className="win-r">®</span> Windows<span className="win-r">®</span> 95</div>
+          <div className="win-start">Starting Windows 95...</div>
+        </div>
+      ) : (
+        <div className="win-bsod">
+          <div className="bsod-title">Windows</div>
+          <p>
+            A fatal exception 0E has occurred at 0028:C0011E36 in VXD TZM(01) +
+            00010E36. The current application will be terminated.
+          </p>
+          <p>
+            *&nbsp;&nbsp;Press any key to terminate the current application.<br />
+            *&nbsp;&nbsp;Press CTRL+ALT+DEL again to restart your computer. You will
+            lose any unsaved information in all applications.
+          </p>
+          <p className="bsod-continue">Press any key to continue <span className="cursor">{'█'}</span></p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ==================== the sl train ====================
+   Every terminal person has typed it by accident. The punishment is
+   the same here as everywhere: you wait for the locomotive. */
+
+const SL_TRAIN = [
+  '      ====        ________                ___________',
+  '  _D _|  |_______/        \\__I_I_____===__|_________|',
+  '   |(_)---  |   H\\________/ |   |        =|___ ___|  ',
+  '   /     |  |   H  |  |     |   |         ||_| |_||  ',
+  '  |      |  |   H  |__--------------------| [___] |  ',
+  '  | ________|___H__/__|_____/[][]~\\_______|       |  ',
+  '  |/ |   |-----------I_____I [][] []  D   |=======|__',
+  '__/ =| o |=-~~\\  /~~\\  /~~\\  /~~\\ ____Y___________|__',
+  ' |/-=|___|=    ||    ||    ||    |_____/~\\___/       ',
+  '  \\_/      \\O=====O=====O=====O_/      \\_/           ',
+].join('\n');
+
+function TrainFX() {
+  return (
+    <div className="out train">
+      <pre className="train-inner">{SL_TRAIN}</pre>
+      <span className="dim">you meant {'\''}ls{'\''}. too late now.</span>
+    </div>
+  );
+}
+
 /* ==================== the whisper ====================
    Leave the monitor off long enough and someone starts typing on it.
    The film played this on a sleeping screen too — the tube is dark, the
@@ -2398,45 +2914,100 @@ function MatrixWhisper({ tick, onDone }) {
 }
 
 /* ==================== the wake intro ====================
-   The site opens the way the film did: a dark tube, someone typing at
-   you. Two lines, a few seconds, and the BIOS takes over — and like
-   everything in the boot, one tap skips straight to the shell. */
+   The site opens differently every visit — four doors into the same
+   room. The film's whisper, a BBS dial-up (with the handshake, sung),
+   a login that lets you in, or a VHS tape rewinding to the start.
+   All of them a few seconds, all of them one tap from the shell. */
 
-function WakeIntro({ onDone, tick }) {
-  const [txt, setTxt] = useState('');
+function WakeIntro({ onDone, tick, modem }) {
+  const [rows, setRows] = useState(['']);
   const [out, setOut] = useState(false);
 
   useEffect(() => {
     let alive = true;
     const timers = [];
     const wait = (ms) => new Promise((res) => { timers.push(setTimeout(res, ms)); });
+    const R = [''];
+    const sync = () => { if (alive) setRows([...R]); };
+    const put = (s) => { R[R.length - 1] = s; sync(); };
+    const pushNow = (s) => { R.push(s); sync(); };
+    const type = async (text, spd = 52) => {
+      for (const ch of text) {
+        if (!alive) return;
+        R[R.length - 1] += ch; sync();
+        if (tick) tick();
+        await wait(spd + Math.random() * 45);
+      }
+    };
+    const erase = async (spd = 15) => {
+      while (R[R.length - 1].length) {
+        if (!alive) return;
+        R[R.length - 1] = R[R.length - 1].slice(0, -1); sync();
+        await wait(spd);
+      }
+    };
 
     (async () => {
-      let cur = '';
-      const type = async (text, spd = 52) => {
-        for (const ch of text) {
+      const door = rpick(['matrix', 'dialup', 'login', 'vhs']);
+
+      if (door === 'matrix') {
+        await wait(900);
+        await type('Wake up...');
+        await wait(1100); await erase(); await wait(350);
+        await type('The Matrix has you.');
+        await wait(1200);
+
+      } else if (door === 'dialup') {
+        await wait(700);
+        await type('ATDT 0055-21-1987', 46);
+        await wait(500);
+        pushNow('DIALING...');
+        if (modem) modem();
+        await wait(2400);
+        pushNow('CARRIER 33600');
+        await wait(400);
+        pushNow('PROTOCOL: TZM-OS/1.3');
+        await wait(350);
+        pushNow('CONNECT');
+        await wait(1000);
+
+      } else if (door === 'login') {
+        await wait(800);
+        await type('cyberspace login: ', 30);
+        await wait(500);
+        await type('tzm', 150);
+        await wait(400);
+        pushNow('');
+        await type('password: ', 30);
+        await wait(600);
+        await type('***********', 65);
+        await wait(800);
+        pushNow('ACCESS GRANTED.');
+        await wait(500);
+        pushNow('last login: Jan  1 1987 on tty1');
+        await wait(1300);
+
+      } else {
+        /* vhs: the tape has to go back to the beginning first */
+        await wait(700);
+        let s = 47 * 60 + 13;
+        while (s > 0) {
           if (!alive) return;
-          cur += ch; setTxt(cur);
-          /* the same ghost keystrokes the whisper makes — though on a
-             fresh visit the browser keeps audio locked until the first
-             touch, so the very first line may play silent */
+          s = Math.max(0, s - 97);
+          const m = String((s / 60) | 0).padStart(2, '0');
+          const ss = String(s % 60).padStart(2, '0');
+          put(`\u25C4\u25C4 REW  00:${m}:${ss}`);
           if (tick) tick();
-          await wait(spd + Math.random() * 45);
+          await wait(55);
         }
-      };
-      const erase = async () => {
-        while (cur.length) {
-          if (!alive) return;
-          cur = cur.slice(0, -1); setTxt(cur);
-          await wait(15);
-        }
-      };
-      await wait(900);
-      await type('Wake up...');
-      await wait(1100); await erase(); await wait(350);
-      await type('The Matrix has you.');
-      await wait(1200);
-      /* the line doesn't fade — the signal carrying it tears */
+        await wait(350);
+        put('\u25B6 PLAY');
+        await wait(650);
+        pushNow('TRACKING ......... ok');
+        await wait(1000);
+      }
+
+      /* every door closes the same way: the signal tears */
       if (!alive) return;
       setOut(true);
       await wait(380);
@@ -2448,36 +3019,40 @@ function WakeIntro({ onDone, tick }) {
 
   return (
     <div className={`wake-intro ${out ? 'out' : ''}`} aria-hidden="true">
-      {txt}<span className="cursor">{'█'}</span>
+      {rows.map((r, i) => (
+        <div key={i} className="wake-row">
+          {r}
+          {i === rows.length - 1 && <span className="cursor">{'\u2588'}</span>}
+        </div>
+      ))}
     </div>
   );
 }
 
 /* ==================== dust motes ====================
-   The room's dust, drifting through the cone of light in front of the
-   glass. They live outside the raster — the tube doesn't draw them, it
-   only illuminates them — and they're the one thing here allowed to
-   move without the beam's permission. Desktop-only: a phone gets held
-   too close for floating dust to read as anything but dirt. */
+   Dust hanging in the air in the cone of light the tube throws — it
+   lives in front of the whole monitor, the beam doesn't draw it, it only
+   lights it, and it drifts slowly upward the way real motes do. Masked
+   to the emission glow, so a grain outside the light simply isn't lit.
+   Desktop-only: a phone is held too close for floating dust to read as
+   anything but dirt on the screen. */
 
-function Motes({ room }) {
+function Motes() {
   const motes = useMemo(() => {
     if (prefersReducedMotion()) return [];
     if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return [];
-    /* room dust hangs in the cone of light in front of the monitor —
-       more of it, bigger grains, gathered toward the tube */
-    return Array.from({ length: room ? 15 : 9 }, () => ({
-      x: room ? rnd(16, 84) : rnd(4, 96),
-      y: room ? rnd(6, 86) : rnd(6, 92),
-      s: room ? rnd(1, 2.6) : rnd(1, 2.1),
-      dur: rnd(16, 38), delay: -rnd(0, 30),
-      dx: rnd(-16, 16), dy: -rnd(8, 26),
-      o: room ? rnd(0.04, 0.13) : rnd(0.05, 0.16),
+    return Array.from({ length: 14 }, () => ({
+      x: rnd(18, 82),
+      y: rnd(12, 84),
+      s: rnd(1.2, 2.6),
+      dur: rnd(20, 44), delay: -rnd(0, 30),
+      dx: rnd(-12, 12), dy: -rnd(10, 26),
+      o: rnd(0.07, 0.2),
     }));
   }, []);
   if (!motes.length) return null;
   return (
-    <div className={`motes ${room ? 'room' : ''}`} aria-hidden="true">
+    <div className="motes room" aria-hidden="true">
       {motes.map((m, i) => (
         <span
           key={i}
@@ -2540,6 +3115,7 @@ function App() {
   const [saver, setSaver] = useState(false);
   const [whisper, setWhisper] = useState(false);
   const [paint, setPaint] = useState(false);
+  const [win95, setWin95] = useState(false);
   const [osEnter, setOsEnter] = useState(false);
 
   /* the two knobs every tube had. They detent through three positions
@@ -2794,6 +3370,8 @@ function App() {
     white:  { fg: '#e8f4ff', bg: '#02060a', glow: '#a8d8ff', hue: '0deg'  },
     cyan:   { fg: '#4fe6ff', bg: '#011014', glow: '#7af0ff', hue: '150deg' },
     magenta:{ fg: '#ff5fd1', bg: '#0a0410', glow: '#ff9be4', hue: '270deg' },
+    /* P11: the oscilloscope blue — short persistence, pure signal */
+    blue:   { fg: '#5d9bff', bg: '#020614', glow: '#8fc0ff', hue: '210deg' },
   };
   const ph = phosphorMap[v.phosphor] || phosphorMap.green;
 
@@ -2830,8 +3408,21 @@ function App() {
     }
     if (c === 'help' || c === '?') {
       out = { kind: 'help' };
-    } else if (c === 'about' || c === 'whoami' || c === 'cat about.txt') {
+    } else if (c === 'about' || c === 'whoami') {
       out = { kind: 'about' };
+    } else if (c === 'man' || c === 'man man') {
+      out = { kind: 'text', text: "what manual page do you want? try 'man tzm'" };
+    } else if (c.startsWith('man ')) {
+      const parts = c.slice(4).trim().split(/\s+/);
+      const flags = parts.filter(p => p.startsWith('--'));
+      const page = parts.find(p => !p.startsWith('--')) || '';
+      const mlang = flags.includes('--en') ? 'en'
+        : (flags.includes('--pt') || flags.includes('--pt-br')) ? 'pt' : null;
+      out = ['tzm', 'thezakman', 'zakman', 'pedro', 'about', 'me'].includes(page)
+        ? { kind: 'man', lang: mlang }
+        : { kind: 'text', text: `no manual entry for ${page || c.slice(4).trim()}`, warn: true };
+    } else if (c === 'about --full' || c === 'whoami --full' || c === 'cat about.txt') {
+      out = { kind: 'man' };
     } else if (c === 'social' || c === 'ls' || c === 'll') {
       out = { kind: 'social' };
     } else if (c === 'ls -la' || c === 'ls -l' || c === 'ls -al' || c === 'ls -la /social') {
@@ -2866,7 +3457,7 @@ function App() {
       after(500, () => setSaver(true));
       return;
     } else if (c === 'phosphor' || c.startsWith('phosphor ')) {
-      const tubes = ['green', 'amber', 'white', 'cyan', 'magenta'];
+      const tubes = ['green', 'amber', 'white', 'cyan', 'magenta', 'blue'];
       const arg = c.split(/\s+/)[1];
       if (!arg) {
         out = { kind: 'text', text: `current tube: ${v.phosphor}. usage: phosphor <${tubes.join('|')}>` };
@@ -2881,6 +3472,8 @@ function App() {
       /* off the strip and out of help, but neofetch's "17527 cat photos"
          sets it up, so it stays here for anyone who goes looking */
       out = { kind: 'cats' };
+    } else if (c === 'weather' || c === 'clima' || c === 'wttr') {
+      out = { kind: 'weather' };
     } else if (c === 'date') {
       out = { kind: 'text', text: nowStr() };
     } else if (c === 'clear' || c === 'cls') {
@@ -2905,6 +3498,107 @@ function App() {
       setHistory(h => [...h, echo, { kind: 'text', text: 'signal lost. (the shell is still running — wake it with any key)' }]);
       after(420, powerOff);
       return;
+    } else if (c === 'win' || c === 'win95' || c === 'windows' || c === 'start windows' || c === 'win.com') {
+      setHistory(h => [...h, echo, { kind: 'text', text: 'oh no. booting the other guy...', warn: true }]);
+      after(600, () => setWin95(true));
+      return;
+    } else if (c === 'sl') {
+      out = { kind: 'train' };
+    } else if (c === 'cowsay' || c.startsWith('cowsay ')) {
+      const msg = cmd.slice(7).trim() || rpick(['moo.', 'the tube is warm.', 'have you tried demo?', 'phosphor is a state of mind.']);
+      const bar = '-'.repeat(msg.length + 2);
+      out = { kind: 'pre', text: ` _${bar}_\n< ${msg} >\n --${bar}\n        \\   ^__^\n         \\  (oo)\\_______\n            (__)\\       )\\/\\\n                ||----w |\n                ||     ||` };
+    } else if (c === 'vim' || c === 'vi') {
+      out = { kind: 'text', text: "you're in vim now. there is no exit. (kidding — this isn't vim. you were free the whole time.)" };
+    } else if (c === 'emacs') {
+      out = { kind: 'text', text: 'emacs needs more RAM than this tube has. 640K, remember?' };
+    } else if (c === 'hack the planet' || c === 'hackers') {
+      out = { kind: 'text', text: 'HACK THE PLANET! HACK THE PLANET!' };
+    } else if (c === 'iddqd') {
+      setTweak('glow', 1.5);
+      degauss();
+      out = { kind: 'text', text: 'god mode enabled. phosphor at maximum. the coil fears nothing.' };
+    } else if (c === 'idkfa') {
+      out = { kind: 'text', text: 'all weapons granted: one (1) keyboard.' };
+    } else if (c === 'format c:' || c === 'format c') {
+      out = { kind: 'text', text: 'FORMAT blocked: drive C: contains 17527 cat photos. some things are sacred.', warn: true };
+    } else if (c === '42' || c === 'meaning of life') {
+      out = { kind: 'text', text: '42. next question.' };
+    } else if (c === 'xyzzy') {
+      out = { kind: 'text', text: 'nothing happens. (that IS the reference.)' };
+    } else if (c === 'coffee' || c === 'cafe' || c === 'café') {
+      out = { kind: 'pre', text: '      ) )\n     ( (\n   .______.\n   |      |]\n   \\      /\n    `----´', tail: 'brewing... done. gpu overclocked.' };
+    } else if (c === 'cat /etc/passwd') {
+      out = { kind: 'pre', text: [
+        'root:x:0:0:root:/root:/bin/tzm-sh',
+        'tzm:x:1337:1337:TheZakMan:/home/tzm:/bin/tzm-sh',
+        'guest:x:1999:1999:you, probably:/home/guest:/bin/rbash',
+        'neo:x:101:101:the one:/dev/matrix:/bin/false',
+        'rabbit:x:102:102:white rabbit:/var/burrow:/bin/hop',
+        'cat:x:17527:17527:cat daemon:/var/cats:/bin/meow',
+        'nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin',
+      ].join('\n'), tail: 'yes, that was the whole audit. congratulations.' };
+    } else if (c === 'cat /etc/shadow') {
+      out = { kind: 'text', text: 'cat: /etc/shadow: permission denied. (even here. especially here.)', warn: true };
+    } else if (c === 'id') {
+      out = { kind: 'text', text: 'uid=1999(guest) gid=1999(visitors) groups=1999(visitors),1337(believers),17527(cat-people)' };
+    } else if (c === 'uname' || c === 'uname -a') {
+      out = { kind: 'text', text: 'TZM-OS cyberspace 1.3.37-vt-glow #1987 SMP PREEMPT_CRT Jan 1 00:00 UTC-3 1987 phosphor GNU/Cathode' };
+    } else if (c === 'ps' || c === 'ps aux' || c === 'top') {
+      out = { kind: 'pre', text: [
+        '  PID  TTY    TIME     CMD',
+        '    1  tty1   39y      /sbin/init --since=1987',
+        '   87  tty1   12:34    /usr/bin/phosphor --green',
+        ' 1337  tty1   00:42    tzm-sh',
+        ' 1999  tty1   ??:??    whisper <defunct>',
+        '17527  tty1   9 lives  cat-daemon',
+        '31337  tty1   00:00    you',
+      ].join('\n') };
+    } else if (c === 'ifconfig' || c === 'ip a' || c === 'ip addr') {
+      out = { kind: 'pre', text: [
+        'cyberspace0: flags=UP,BROADCAST,DREAMING  mtu 1987',
+        '      inet 127.0.0.1  netmask 255.0.0.0',
+        '      ether de:ad:be:ef:19:87  (Cathode Ray Ethernet)',
+        '      RX packets: everything you typed',
+        '      TX packets: everything you saw',
+      ].join('\n') };
+    } else if (c === 'nmap' || c === 'nmap localhost' || c === 'nmap 127.0.0.1' || c === 'nmap -sv' || c === 'nmap cyberspace') {
+      out = { kind: 'pre', text: [
+        'Starting Nmap ( https://nmap.org ) at 1987-01-01 00:00 UTC-3',
+        'Nmap scan report for cyberspace (127.0.0.1)',
+        'PORT       STATE   SERVICE',
+        '1987/tcp   open    tzm-sh',
+        '5150/tcp   open    van-halen',
+        '31337/tcp  open    elite',
+        '443/tcp    closed  secrets (there are none)',
+        '',
+        'Nmap done: 1 host up. it was this one. it was always this one.',
+      ].join('\n') };
+    } else if (c === 'ping' || c.startsWith('ping ')) {
+      out = { kind: 'pre', text: [
+        'PING cyberspace (127.0.0.1): 56 data bytes',
+        '64 bytes from 127.0.0.1: icmp_seq=0 ttl=1987 time=0.042 ms',
+        '64 bytes from 127.0.0.1: icmp_seq=1 ttl=1987 time=0.037 ms',
+        '64 bytes from 127.0.0.1: icmp_seq=2 ttl=1987 time=0.039 ms',
+      ].join('\n'), tail: "you can't ping what pings you first." };
+    } else if (c === 'ssh' || c.startsWith('ssh ')) {
+      out = { kind: 'text', text: 'ssh: connection refused — this tube accepts incoming beams only.', warn: true };
+    } else if (c === 'curl' || c.startsWith('curl ') || c === 'wget' || c.startsWith('wget ')) {
+      out = { kind: 'text', text: "no outbound uplink from here. the only line out goes to the sky — try 'weather'." };
+    } else if (c === 'pwd') {
+      out = { kind: 'text', text: '/home/tzm/cyberspace' };
+    } else if (c === 'history') {
+      const vintage = [
+        ['1987', 'make world'],
+        ['1997', 'telnet bbs.cyberspace.br 23'],
+        ['2016', 'mv ~/design ~/security'],
+        ['2019', './rock_in_rio --realtime --no-retry'],
+        ['2024', 'man tzm'],
+      ];
+      const now = cmdHistory.current.slice(0, -1).map((h2) => ['2026', h2]);
+      out = { kind: 'pre', text: [...vintage, ...now]
+        .map(([y, cm]) => `  ${y}  ${cm}`).join('\n'),
+        tail: 'everything before you arrived is compressed. it was a long time.' };
     } else if (c.startsWith('sudo')) {
       out = { kind: 'text', text: `[sudo] password for ${c.slice(5) || 'guest'}: incorrect. try 'help'.`, warn: true };
     } else if (c === 'rm -rf /' || c === 'rm -rf') {
@@ -3023,9 +3717,6 @@ function App() {
               a picture of a reflection. */}
           {v.reflection > 0 && <div className="glare"></div>}
 
-          {/* dust hanging in the light in front of the tube */}
-          {v.grime && <Motes />}
-
           {/* the glass itself: 30 years of dust, fingerprints and dead subpixels */}
           {v.grime && (
             <>
@@ -3058,6 +3749,7 @@ function App() {
             {phase === 'wake' && (
               <WakeIntro
                 tick={v.sound ? sound.keyTick : null}
+                modem={v.sound ? sound.modemSound : null}
                 onDone={() => setPhase('boot')}
               />
             )}
@@ -3108,10 +3800,21 @@ function App() {
                   );
                   if (h.kind === 'about') return (
                     <div key={i} className="out">
+                      <p className="story-row story-first">
+                        <button
+                          className="story-link"
+                          onClick={() => { sound.clickSound(); runCommand('man tzm'); }}
+                        >
+                          <span className="story-arrow">{'▸'}</span>
+                          <span className="story-label">man tzm</span>
+                        </button>
+                        <span className="story-tail">the whole story — en / pt-br</span>
+                      </p>
                       <p>I'm a <span className="hi">Hacker / Graphic &amp; CGI Artist</span> that loves to play guitar and mess around with python <span className="heart">{'♥'}</span></p>
                       <p>On the internet breaking and fixing stuff, since <span className="hi">1997</span>.</p>
                     </div>
                   );
+                  if (h.kind === 'man') return <ManPage key={i} onRun={runCommand} lang={h.lang} />;
                   if (h.kind === 'social') return (
                     <div key={i} className="out">
                       {SOCIALS.map((s) => <SocialRow key={s.name} s={s} />)}
@@ -3124,15 +3827,31 @@ function App() {
                     </div>
                   );
                   if (h.kind === 'donate') return (
-                    <div key={i} className="out">
-                      <pre className="beer">{String.raw`
-        .~~~~.
-        i====i_
-        |cccc| |   "If you like my art or anything I do,
-        |cccc|_/    send me a beer. I do most of my cool
-        \___,/      stuff with a cold one." — tzm
-`}</pre>
-                      <a className="btn" href="https://www.paypal.com/donate?business=thezakman@icloud.com&amount=5&currency_code=USD" target="_blank" rel="noopener noreferrer">[ paypal · $5 · cheers {'🍺'} ]</a>
+                    <div key={i} className="out donate">
+                      <div className="donate-row">
+                        <BeerFX />
+                        <div className="donate-txt">
+                          <p>"If you like my art or anything I do, send me a beer. I do most of my cool stuff with a cold one." <span className="dim">— tzm</span></p>
+                          <div className="tap-head">on tap · via paypal</div>
+                          <div className="tap-list">
+                            {TAPS.map(([label, amt]) => (
+                              <a
+                                key={amt}
+                                className="tap-row"
+                                href={`https://www.paypal.com/donate?business=thezakman@icloud.com&amount=${amt}&currency_code=USD`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <span className="tap-label">{label}</span>
+                                <span className="tap-dots"></span>
+                                <span className="tap-price">${amt}</span>
+                                <span className="tap-pour">[ pour ]</span>
+                              </a>
+                            ))}
+                          </div>
+                          <p className="dim beer-log">beer_fund.log: refills accepted since 1987 · 100% converted into demos {'🍺'}</p>
+                        </div>
+                      </div>
                     </div>
                   );
                   if (h.kind === 'contact') return (
@@ -3151,6 +3870,14 @@ function App() {
                   );
                   if (h.kind === 'hardware') return <NeofetchBlock key={i} />;
                   if (h.kind === 'demo') return <DemoFX key={i} name={h.name} />;
+                  if (h.kind === 'train') return <TrainFX key={i} />;
+                  if (h.kind === 'weather') return <WeatherBlock key={i} />;
+                  if (h.kind === 'pre') return (
+                    <div key={i} className="out">
+                      <pre className="catart">{h.text}</pre>
+                      {h.tail && <span className="dim">{h.tail}</span>}
+                    </div>
+                  );
                   if (h.kind === 'cats') return (
                     <div key={i} className="out">
                       <pre className="catart">{String.raw`
@@ -3197,6 +3924,15 @@ function App() {
               </div>
               <FKeyBar onRun={(cmd) => { sound.clickSound(); runCommand(cmd); }} />
             </div>
+          )}
+
+          {/* the forbidden boot, over everything the raster owns */}
+          {win95 && (
+            <Win95 onExit={() => {
+              setWin95(false);
+              setHistory(h => [...h, { kind: 'text', text: '> windows has crashed, like old times. welcome back to tzm-os.' }]);
+              setTimeout(() => { if (inputRef.current) inputRef.current.focus(); }, 60);
+            }} />
           )}
 
           {/* the studio takes the raster over, same plane as the saver */}
@@ -3299,9 +4035,9 @@ function App() {
         </span>
       </div>
 
-      {/* dust in the room, hanging where the tube's light can catch it —
-          in front of the whole monitor, not behind the glass */}
-      {v.grime && <Motes room />}
+      {/* dust in the air, hanging where the tube's light can catch it —
+          in front of the whole monitor, floating in the emission glow */}
+      {v.grime && <Motes />}
 
       {/* Tweaks panel */}
       {window.TweaksPanel && (() => {
@@ -3319,6 +4055,7 @@ function App() {
                   { value: 'white',   label: 'White (P4)' },
                   { value: 'cyan',    label: 'Cyan' },
                   { value: 'magenta', label: 'Magenta' },
+                  { value: 'blue',    label: 'Blue (P11)' },
                 ]}
               />
               <TweakSlider label="Glow" value={v.glow} min={0} max={1.5} step={0.05} onChange={(x) => setTweak('glow', x)} />
