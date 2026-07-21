@@ -787,6 +787,34 @@ function NeofetchBlock() {
   );
 }
 
+/* ==================== the signature ====================
+   The short "who am I" that types itself out under the opening neofetch,
+   like the machine introducing its owner. Plain text while it types, then
+   each line settles into its highlighted form. The full story lives in
+   `man tzm` / the `about` command — this is just the hello. */
+
+function SignatureAbout() {
+  const L1 = "I'm a Hacker / Graphic & CGI Artist that loves to play guitar and mess around with python ♥";
+  const L2 = 'On the internet breaking and fixing stuff, since 1997.';
+  const [t1, d1] = useTypeOn(L1, 15, true);
+  const [t2, d2] = useTypeOn(L2, 15, d1);
+  return (
+    <div className="out sig-about">
+      <p>{d1
+        ? <>I'm a <span className="hi">Hacker / Graphic &amp; CGI Artist</span> that loves to play guitar and mess around with python <span className="heart">{'♥'}</span></>
+        : <>{t1}<span className="cursor">{'█'}</span></>}</p>
+      {d1 && <p>{d2
+        ? <>On the internet breaking and fixing stuff, since <span className="hi">1997</span>.</>
+        : <>{t2}<span className="cursor">{'█'}</span></>}</p>}
+      {d2 && (
+        <p className="dim sig-more">
+          full story: type <span className="hi">about</span> · or <span className="hi">man tzm --pt</span> for pt-br
+        </p>
+      )}
+    </div>
+  );
+}
+
 /* ==================== man tzm ====================
    The long-form about, typeset the only way a terminal ever shipped a
    biography. Ships in both of the man's languages: English by default —
@@ -3698,7 +3726,7 @@ function App() {
     if (c === 'help' || c === '?') {
       out = { kind: 'help' };
     } else if (c === 'about' || c === 'whoami') {
-      out = { kind: 'about' };
+      out = { kind: 'man' };
     } else if (c === 'man' || c === 'man man') {
       out = { kind: 'text', text: "what manual page do you want? try 'man tzm'" };
     } else if (c.startsWith('man ')) {
@@ -4108,9 +4136,10 @@ function App() {
             {/* === MAIN CONTENT === */}
             {phase === 'done' && (
               <>
-                {/* NEOFETCH */}
+                {/* NEOFETCH, then the owner introduces himself */}
                 <FullPrompt cmd="neofetch" />
                 <NeofetchBlock />
+                <SignatureAbout />
 
                 {/* one line of signposting for whoever just walked in */}
                 <div className="out first-hint">
@@ -4132,22 +4161,6 @@ function App() {
                       <div className="help-foot dim">
                         tab completes · {'↑'}{'↓'} walks history · F1-F9 (or alt+1-9) run the strip below
                       </div>
-                    </div>
-                  );
-                  if (h.kind === 'about') return (
-                    <div key={i} className="out">
-                      <p className="story-row story-first">
-                        <button
-                          className="story-link"
-                          onClick={() => { sound.clickSound(); runCommand('man tzm'); }}
-                        >
-                          <span className="story-arrow">{'▸'}</span>
-                          <span className="story-label">man tzm</span>
-                        </button>
-                        <span className="story-tail">the whole story — en / pt-br</span>
-                      </p>
-                      <p>I'm a <span className="hi">Hacker / Graphic &amp; CGI Artist</span> that loves to play guitar and mess around with python <span className="heart">{'♥'}</span></p>
-                      <p>On the internet breaking and fixing stuff, since <span className="hi">1997</span>.</p>
                     </div>
                   );
                   if (h.kind === 'man') return <ManPage key={i} onRun={runCommand} lang={h.lang} />;
