@@ -564,13 +564,15 @@ function useCrtSound(enabled, volume) {
     const t0 = ctx.currentTime + 0.15;
 
     /* The real thing: [semitone from A4, beats], transcribed straight from
-       the Duvet .mid (track 0, the vocal line) — the opening phrase,
-       "and you don't seem to understand". Not a paraphrase this time. */
+       the Duvet .mid (the Electric Piano lead — the monophonic vocal line),
+       the opening phrase "and you don't seem to understand", resolving on
+       the long tonic B. Not a paraphrase — lifted note-for-note. */
     const MEL = [
-      [-7, 0.5], [-8, 0.5], [-10, 0.5], [-8, 0.5], [-7, 0.5], [-5, 0.5], [-3, 0.5], [-10, 2],
-      [-7, 0.5], [-5, 0.5], [-10, 0.5], [-7, 0.5], [-5, 0.5], [-7, 0.5], [-8, 0.5], [-10, 0.5],
-      [-8, 0.5], [-7, 0.5], [-5, 0.5], [-3, 0.5], [-5, 1], [-7, 1],
-      [-7, 0.5], [-5, 0.5], [-10, 0.5], [-7, 0.5], [-5, 0.5], [-7, 0.5], [-8, 0.5], [-10, 0.5],
+      [-7, 0.5], [-8, 0.5], [-10, 0.5], [-8, 0.5], [-7, 0.5], [-5, 1], [-3, 1], [-10, 0.5],
+      [-12, 0.5], [-10, 1.5], [-12, 1.5], [null, 0.5], [-7, 0.5], [-8, 0.5], [-10, 0.5], [-8, 0.5],
+      [-7, 0.5], [-5, 1], [-3, 0.5], [-5, 0.5], [-3, 0.5], [-5, 1], [-7, 1], [-8, 1.5],
+      [null, 0.5], [-7, 0.5], [-8, 0.5], [-10, 0.5], [-8, 0.5], [-7, 0.5], [-5, 1], [-3, 1],
+      [-10, 0.5], [-12, 0.5], [-10, 2],
     ];
 
     const voice = (freq, at, dur, type, level) => {
@@ -2385,7 +2387,11 @@ function DemoFX({ fill, name }) {
       const cw = span.getBoundingClientRect().width / 100;
       span.remove();
       if (cw <= 0.5) return;
-      const next = Math.max(24, Math.min(240, Math.floor(el.clientWidth / cw)));
+      /* cap high enough that a full-bleed field fills even a wide, high-DPI
+         tube edge-to-edge — 240 (then 480) still left a dead strip on the
+         right of a dense display. Rows stay bounded, so W*H per frame is
+         cheap even at this width. */
+      const next = Math.max(24, Math.min(720, Math.floor(el.clientWidth / cw)));
       /* In fill mode the effect owns the whole raster, so the row count
          comes from the box instead of DEMO_ROWS — clamped, because the
          stateful demos cost W*H per frame. */

@@ -1154,13 +1154,14 @@ body {
 /* ====================== TERMINAL ====================== */
 
 .terminal {
+  --tpad: 22px;   /* side padding, reused by full-bleed blocks (.demo) */
   position: relative;
   z-index: 5;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 22px 22px 10px;
+  padding: 22px var(--tpad) 10px;
   text-shadow: var(--text-shadow);
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
@@ -2005,10 +2006,14 @@ body {
 /* ====================== PROCEDURAL DEMO ====================== */
 
 .demo {
+  /* full-bleed: cancel the terminal's side padding so the field spans the
+     whole tube edge-to-edge. overflow stays visible so the name tag can sit
+     up on the prompt line above the box — the pre clips itself instead. */
   position: relative;
-  margin: 6px 0;
-  border: 1px solid color-mix(in oklab, var(--fg) 22%, transparent);
-  overflow: hidden;
+  margin: 6px calc(-1 * var(--tpad, 22px));
+  border-top: 1px solid color-mix(in oklab, var(--fg) 22%, transparent);
+  border-bottom: 1px solid color-mix(in oklab, var(--fg) 22%, transparent);
+  overflow: visible;
 }
 .demo-out {
   font-family: 'VT323', 'IBM Plex Mono', monospace;
@@ -2020,10 +2025,12 @@ body {
   text-shadow: var(--text-shadow);
   min-height: 338px;   /* DEMO_ROWS x line-height, so it can't jump on start */
   margin: 0;
+  overflow: hidden;    /* the box clips its own field; the tag stays free */
 }
 .demo-tag {
+  /* parked up on the prompt-echo line ("tzm@…:~$ demo"), hard right */
   position: absolute;
-  top: 5px; right: 8px;
+  top: -1.35em; right: 16px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 10px;
   letter-spacing: 0.14em;
@@ -2132,7 +2139,7 @@ body {
   .hw-controls .hw-btn.snd { font-size: 12px; padding: 0 9px; }
   .bezel::after { top: 6px; left: 6px; right: 6px; bottom: 50px; border-radius: 14px; }
   .statusbar { font-size: 9px; gap: 10px; padding: 8px 10px; }
-  .terminal { padding: 12px 12px 60px; font-size: 17px; }
+  .terminal { --tpad: 12px; padding: 12px var(--tpad) 60px; font-size: 17px; }
   .socrow { font-size: 12px; }
   .out.grid2 { grid-template-columns: 1fr; }
   .neofetch { grid-template-columns: 80px 1fr; gap: 12px; }
@@ -2173,7 +2180,8 @@ body {
   }
   .statusbar .seg.hide-mobile { display: none; }
   .terminal {
-    padding: 10px 10px 40px;
+    --tpad: 10px;
+    padding: 10px var(--tpad) 40px;
     padding-bottom: max(40px, env(safe-area-inset-bottom, 0px));
     font-size: 15px;
   }
